@@ -30,7 +30,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t fastapi-app .
+          docker build -t fastapi-app -f fastapi/Dockerfile .
 
       # - name: Tag image
       #   run: |
