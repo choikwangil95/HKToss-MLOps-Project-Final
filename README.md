@@ -34,7 +34,7 @@ docker-compose.yaml
 
 ### 아키텍쳐
 
-![화면 캡처 2025-05-15 105248.png](attachment:d371e90c-0a7f-4a45-96ea-015aae6cf0c6:화면_캡처_2025-05-15_105248.png)
+![화면 캡처 2025-05-15 105248](https://github.com/user-attachments/assets/045c5829-80a4-423b-838d-55db84296bb6)
 
 
 ## 3 개발환경 구성
