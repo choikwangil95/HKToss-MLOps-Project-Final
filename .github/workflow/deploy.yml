@@ -1,0 +1,41 @@
+# .github/workflows/deploy.yml
+
+name: Deploy to AWS ECR
+
+on:
+  push:
+    branches: [develop]  # 또는 develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write  # OIDC로 AWS 인증 시 필요
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # - name: Configure AWS credentials (OIDC)
+      #   uses: aws-actions/configure-aws-credentials@v2
+      #   with:
+      #     role-to-assume: arn:aws:iam::123456789012:role/github-actions-ecr-push-role
+      #     aws-region: ap-northeast-2
+
+      # - name: Login to Amazon ECR
+      #   id: login-ecr
+      #   uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build Docker image
+        run: |
+          docker build -t fastapi-app .
+
+      # - name: Tag image
+      #   run: |
+      #     docker tag fastapi-app:latest ${{ steps.login-ecr.outputs.registry }}/fastapi-app:latest
+
+      # - name: Push to Amazon ECR
+      #   run: |
+      #     docker push ${{ steps.login-ecr.outputs.registry }}/fastapi-app:latest
