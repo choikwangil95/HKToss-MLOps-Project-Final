@@ -1,0 +1,21 @@
+# Web server & routing
+fastapi
+uvicorn
+
+# Data processing & transformation
+numpy
+pandas
+
+# ML inference & training
+scikit-learn
+joblib
+
+# Schema validation
+pydantic
+
+# Monitoring & metrics
+prometheus-fastapi-instrumentator
+
+# Database & ORM
+sqlalchemy
+psycopg2

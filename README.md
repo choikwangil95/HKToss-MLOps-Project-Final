@@ -26,10 +26,10 @@
 ### 폴더구조
 ```markdown
 📁 src
- ㄴ 📁 app                  # FastAPI
- ㄴ 📁 ...                  # T.B.D
+ ㄴ 📁 fastapi                  # FastAPI
+ ㄴ 📁 ...                          # T.B.D
 📄 requirements.txt
-docker-compose.yaml
+📄 docker-compose.yaml
 ```
 
 ### 아키텍쳐
