@@ -1,7 +1,6 @@
 services:
   fastapi:
-    build:
-      context: ./fastapi
+    image: public.ecr.aws/s7y4j6x4/hktoss-mlops-final:latest
     container_name: fastapi-app
     ports:
       - "8000:8000"
