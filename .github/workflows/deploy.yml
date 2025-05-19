@@ -2,7 +2,7 @@ name: Deploy to Public ECR and EC2
 
 on:
   push:
-    branches: [develop]
+    branches: [main]
 
 env:
   AWS_REGION: ap-northeast-2
@@ -46,7 +46,7 @@ jobs:
             cd ${{ secrets.EC2_PROJECT_DIR }}
             echo "✅ Pull latest code..."
             git reset --hard
-            git pull origin develop
+            git pull origin main
 
             echo "🐳 Re-deploying container..."
             docker-compose down
