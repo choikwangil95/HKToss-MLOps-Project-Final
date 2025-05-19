@@ -15,7 +15,8 @@ services:
   airflow-webserver:
     image: apache/airflow:2.7.2
     container_name: airflow-webserver
-    restart: always
+    mem_limit: 512m
+    restart: on-failure
     entrypoint: [ "/bin/bash", "/entrypoint.sh" ]
     command: [ "webserver" ]
     environment:
@@ -38,7 +39,8 @@ services:
   airflow-scheduler:
     image: apache/airflow:2.7.2
     container_name: airflow-scheduler
-    restart: always
+    restart: on-failure
+    mem_limit: 256m
     entrypoint: [ "/bin/bash", "/entrypoint.sh" ]
     command: [ "scheduler" ]
     environment:
@@ -59,6 +61,8 @@ services:
   db:
     image: postgres:13
     container_name: postgres-db
+    mem_limit: 256m
+    restart: on-failure
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
