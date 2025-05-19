@@ -36,3 +36,22 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f fastapi/Dockerfile fastapi/
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ${{ secrets.EC2_PROJECT_DIR }}
+            echo "✅ Pull latest code..."
+            git reset --hard
+            git pull origin develop
+
+            echo "🐳 Re-deploying container..."
+            docker-compose down
+            docker-compose pull || true
+            docker-compose up -d --build
+
+            echo "🚀 Deployment finished!"
