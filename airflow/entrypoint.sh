@@ -1,13 +1,6 @@
 #!/bin/bash
 set -e
 
-echo "Fixing log directory permission..."
-mkdir -p /opt/airflow/logs
-
-# 권한 변경은 root 사용자만 가능하므로 실패해도 무시
-chown -R airflow:root /opt/airflow/logs || true
-chmod -R 755 /opt/airflow/logs || true
-
 echo "Installing requirements..."
 if [ -f "/requirements.txt" ]; then
   pip install -r /requirements.txt || echo "⚠️ Failed to install requirements"
