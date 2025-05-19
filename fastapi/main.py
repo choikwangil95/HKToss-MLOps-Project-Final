@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from routers import news, status
 from core.init_db import init_db
 
-app = FastAPI(title="MLOps API Server", version="1.0.0")
+app = FastAPI(title="MLOps API Server", version="0.0.0")
 
 
 # 데이터베이스 초기화
