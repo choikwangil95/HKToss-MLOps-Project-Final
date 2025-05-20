@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from schemas.news import News, NewsOut
-from services.news import get_news_list, get_news_detail
+from schemas.news_similar import SimilarNews
+from services.news import get_news_list, get_news_detail, find_news_similar
 from core.db import get_db
+from typing import List
 
 router = APIRouter(prefix="/news", tags=["News"])
 
@@ -15,3 +17,10 @@ def list_news(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
 @router.get("/{news_id}", response_model=NewsOut)
 def news_detail(news_id: int, db: Session = Depends(get_db)):
     return get_news_detail(db, news_id)
+
+
+@router.get("/{news_id}/similar", response_model=List[SimilarNews])
+def similar_news(news_id: str):
+    results = find_news_similar(news_id)
+    return results
+

@@ -19,3 +19,7 @@ prometheus-fastapi-instrumentator
 # Database & ORM
 sqlalchemy
 psycopg2
+
+# ml_model
+sentence_transformers
+scikit-learn
