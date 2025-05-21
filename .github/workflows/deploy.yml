@@ -58,8 +58,12 @@ jobs:
               git pull origin main
             fi
 
-            echo "📦 DVC 모델 파일 다운로드..."
+             echo "🐍 가상환경 생성 및 DVC 설치"
+            python3 -m venv .venv
+            source .venv/bin/activate
             pip install --quiet dvc[s3]
+
+            echo "📦 DVC 파일 다운로드..."
             dvc pull
 
             echo "🐳 Re-deploying container..."
@@ -68,6 +72,13 @@ jobs:
             docker-compose up -d --build
 
             echo "🚀 Deployment finished!"
+
+            echo "📢 Sending Slack notification..."
+            curl -X POST -H 'Content-type: application/json' \
+              --data '{
+                "text": "🚀 *EC2 배포 완료!*\n서비스: `hktoss-mlops-final`\n서버: `EC2`\n시간: '"$(date +'%Y-%m-%d %H:%M:%S')"'"
+              }' \
+              ${{ secrets.SLACK_WEBHOOK_URL}}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
