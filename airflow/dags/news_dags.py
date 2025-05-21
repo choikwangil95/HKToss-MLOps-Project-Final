@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import feedparser
 import requests
 from bs4 import BeautifulSoup
+from bs4 import SoupStrainer
 import os
 import time
 
@@ -33,15 +34,21 @@ def extract_yna_article_body(url: str) -> str:
     except Exception as e:
         return f"[에러] 요청 실패: {e}"
 
-    soup = BeautifulSoup(res.text, "html.parser")
+    only_article = SoupStrainer("div", class_="story-news article")
+    soup = BeautifulSoup(res.text, "lxml", parse_only=only_article)
+
     content_div = soup.select_one("div.story-news.article")
     if not content_div:
         return "[본문 없음]"
+    
     paragraphs = content_div.find_all("p")
-    return "\n".join([
+
+    body = "\n".join([
         p.get_text(strip=True)
         for p in paragraphs if p.get_text(strip=True) and not p.get_text(strip=True).startswith("©")
     ])
+
+    return body
 
 def check_new_rss_news():
     try:
@@ -68,8 +75,10 @@ def check_new_rss_news():
 
         for article in new_articles:
             print(f"[{article.published}] {article.title} - {article.link}")
+
             body = extract_yna_article_body(article.link)
-            print(f"\n--- 본문 ---\n{body[300:]}...\n")  # 본문 앞부분만 출력
+
+            print(f"\n--- 본문 ---\n{body}\n")  # 본문 앞부분만 출력
     else:
         print("새 뉴스 없음.")
 

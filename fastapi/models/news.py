@@ -1,13 +1,16 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime
-from datetime import datetime
-from core.db import Base
+from sqlalchemy import Column, String, Date, Text
+from sqlalchemy.ext.declarative import declarative_base
+from pgvector.sqlalchemy import Vector
+
+Base = declarative_base()
 
 
 class NewsModel(Base):
     __tablename__ = "news"
 
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(255), nullable=False)
-    content = Column(Text, nullable=False)
-    category = Column(String(50))
-    published_at = Column(DateTime, default=datetime.utcnow)
+    news_id = Column(String, primary_key=True)  # VARCHAR PRIMARY KEY
+    date = Column(Date)  # date
+    title = Column(Text)  # title TEXT
+    url = Column(Text)  # url TEXT
+    content = Column(Text)  # content TEXT
+    embedding = Column(Vector(768))  # embedding VECTOR(768)
