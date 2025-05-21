@@ -14,17 +14,6 @@ services:
       - ./fastapi:/fastapi
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # model-api:
-  #   build:
-  #     context: ./model_api
-  #     dockerfile: Dockerfile # fastapi 디렉토리 내부로 이동
-  #   container_name: model_api-app
-  #   ports:
-  #     - "9000:9000"
-  #   volumes:
-  #     - ./model_api:/model_api
-  #   command: uvicorn main:app --host 0.0.0.0 --port 9000 --reload
-
   # airflow-webserver:
   #   image: apache/airflow:2.7.2
   #   container_name: airflow-webserver
