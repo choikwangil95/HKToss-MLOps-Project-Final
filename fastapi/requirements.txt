@@ -20,3 +20,6 @@ pydantic
 sqlalchemy
 psycopg2
 pgvector
+
+# dvc
+dvc[s3]
