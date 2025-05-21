@@ -43,10 +43,19 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            mkdir -p ${{ secrets.EC2_PROJECT_DIR }}
             cd ${{ secrets.EC2_PROJECT_DIR }}
-            echo "✅ Pull latest code..."
-            git reset --hard
-            git pull origin main
+
+            if [ ! -d ".git" ]; then
+              echo "📦 Git 저장소 클론 중..."
+              git init
+              git remote add origin ${{ secrets.GIT_REPOSITORY_URL}}
+            else
+              echo "✅ Pull latest code..."
+              git fetch origin
+              git reset --hard origin/main
+              git pull origin main
+            fi
 
             echo "🐳 Re-deploying container..."
             docker-compose down
