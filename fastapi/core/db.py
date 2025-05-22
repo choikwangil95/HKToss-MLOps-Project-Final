@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 # Docker 환경에서는 환경변수에서 DB URL을 가져옴
 DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://postgres:password@localhost:5432/postgres"
+    "DATABASE_URL", "postgresql://postgres:password@db:5432/postgres"
 )
 
 engine = create_engine(DATABASE_URL)
