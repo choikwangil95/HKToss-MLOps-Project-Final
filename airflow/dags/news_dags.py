@@ -12,7 +12,7 @@ import time
 default_args = {
     "owner": "airflow",
     "start_date": datetime(2025, 5, 13),
-    # "retries": 1,
+    "retries": 0,
     # "retry_delay": timedelta(seconds=30),
 }
 
