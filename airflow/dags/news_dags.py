@@ -8,6 +8,7 @@ import os
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 import time
+import redis
 
 default_args = {
     "owner": "airflow",
@@ -26,6 +27,13 @@ dag = DAG(
 
 NEWS_URL = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=402"
 LAST_CRAWLED_FILE = "/opt/airflow/last_crawled.txt"
+
+
+def publish_to_redis(channel, message):
+    r = redis.Redis(
+        host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", 6379))
+    )
+    r.publish(channel, message)
 
 
 def fetch_article_details(url):
@@ -115,6 +123,9 @@ def fetch_latest_news():
                 f"[NEW] {article['wdate']} - {article['title']} ({article['press']}) - {article['url']}"
             )
             print(f"{article_text}\n")
+
+            # Redis에 뉴스 제목을 publish
+            publish_to_redis("news_alert", article["title"])
 
         # 최신 뉴스 기준으로 last_time 갱신
         latest_time = max(article["wdate"] for article in new_articles)
