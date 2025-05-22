@@ -1,0 +1,5 @@
+outs:
+- md5: 4bc4c2695e0d1c5670afdcaa08282795
+  size: 101212817
+  hash: md5
+  path: news_with_embedding.csv
