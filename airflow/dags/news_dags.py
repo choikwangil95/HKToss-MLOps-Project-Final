@@ -107,7 +107,7 @@ def fetch_latest_news():
 
     # 새 뉴스가 있다면 저장하거나 로깅
     if new_articles:
-        for article in new_articles:
+        for article in new_articles[:5]:  # 상위 5개 기사만 처리
             # 기사 본문과 이미지를 가져옴
             image, article_text = fetch_article_details(article["url"])
 
@@ -115,9 +115,6 @@ def fetch_latest_news():
                 f"[NEW] {article['wdate']} - {article['title']} ({article['press']}) - {article['url']}"
             )
             print(f"{article_text}\n")
-
-            # 1초 대기
-            time.sleep(1)
 
         # 최신 뉴스 기준으로 last_time 갱신
         latest_time = max(article["wdate"] for article in new_articles)
