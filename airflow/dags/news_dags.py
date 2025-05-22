@@ -12,7 +12,7 @@ import time
 default_args = {
     "owner": "airflow",
     "start_date": datetime(2025, 5, 13),
-    "retries": 1,
+    # "retries": 1,
     "retry_delay": timedelta(seconds=30),
 }
 
@@ -21,7 +21,7 @@ dag = DAG(
     default_args=default_args,
     schedule_interval="* * * * *",  # 매 1분
     catchup=False,
-    description="연합뉴스 RSS에서 새 뉴스 수집",
+    description="네이버페이 증권 종목 뉴스에서 새 뉴스 수집",
 )
 
 NEWS_URL = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=402"
