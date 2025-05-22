@@ -17,7 +17,7 @@ services:
   airflow-webserver:
     image: apache/airflow:2.7.2
     container_name: airflow-webserver
-    mem_limit: 512m
+    mem_limit: 2g
     restart: on-failure
     entrypoint: [ "/bin/bash", "/entrypoint.sh" ]
     command: [ "webserver" ]
@@ -42,7 +42,7 @@ services:
     image: apache/airflow:2.7.2
     container_name: airflow-scheduler
     restart: on-failure
-    mem_limit: 256m
+    mem_limit: 512m
     entrypoint: [ "/bin/bash", "/entrypoint.sh" ]
     command: [ "scheduler" ]
     environment:
