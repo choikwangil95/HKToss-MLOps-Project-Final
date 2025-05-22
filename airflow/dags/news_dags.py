@@ -7,6 +7,7 @@ from bs4 import SoupStrainer
 import os
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
+import time
 
 default_args = {
     "owner": "airflow",
@@ -114,6 +115,10 @@ def fetch_latest_news():
                 f"[NEW] {article['wdate']} - {article['title']} ({article['press']}) - {article['url']}"
             )
             print(f"{article_text}\n")
+
+            # 1초 대기
+            time.sleep(1)
+
         # 최신 뉴스 기준으로 last_time 갱신
         latest_time = max(article["wdate"] for article in new_articles)
         with open(LAST_CRAWLED_FILE, "w") as f:
