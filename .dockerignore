@@ -7,17 +7,13 @@ __pycache__/
 *.ipynb_checkpoints/
 
 # 모델, 데이터
-*.pt
-*.bin
-*.pk
-*.pkl
-*.npy
-*.csv
-*.json
-data/
-ml_models/
-db/
-initdb/
+; *.pt
+; *.bin
+; *.pk
+; *.pkl
+; *.npy
+; *.csv
+; *.json
 
 # Git
 .git/
@@ -26,5 +22,3 @@ initdb/
 # 기타
 .DS_Store
 .env
-
-fastapi/ml_models/ko-sbert-sts_model.pk
