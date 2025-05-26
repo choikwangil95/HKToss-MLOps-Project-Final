@@ -26,5 +26,3 @@ initdb/
 # 기타
 .DS_Store
 .env
-
-fastapi/ml_models/ko-sbert-sts_model.pk

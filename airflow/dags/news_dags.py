@@ -1,89 +1,144 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-import feedparser
 import requests
 from bs4 import BeautifulSoup
 from bs4 import SoupStrainer
 import os
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse, parse_qs
 import time
+import redis
 
 default_args = {
-    'owner': 'airflow',
-    'start_date': datetime(2025, 5, 13),
-    'retries': 1,
-    'retry_delay': timedelta(seconds=30),
+    "owner": "airflow",
+    "start_date": datetime(2025, 5, 13),
+    "retries": 0,
+    # "retry_delay": timedelta(seconds=30),
 }
 
 dag = DAG(
-    dag_id='rss_news_monitor',
+    dag_id="rss_news_monitor",
     default_args=default_args,
-    schedule_interval='* * * * *',  # 매 1분
+    schedule_interval="* * * * *",  # 매 1분
     catchup=False,
-    description='연합뉴스 RSS에서 새 뉴스 수집',
+    description="네이버페이 증권 종목 뉴스에서 새 뉴스 수집",
 )
 
-RSS_URL = "https://www.yna.co.kr/rss/economy.xml"
-STATE_FILE = "/opt/airflow/rss_latest_timestamp.txt"
+NEWS_URL = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=402"
+LAST_CRAWLED_FILE = "/opt/airflow/last_crawled.txt"
 
-def extract_yna_article_body(url: str) -> str:
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        res = requests.get(url, headers=headers, timeout=10)
-        res.raise_for_status()
-    except Exception as e:
-        return f"[에러] 요청 실패: {e}"
 
-    only_article = SoupStrainer("div", class_="story-news article")
-    soup = BeautifulSoup(res.text, "lxml", parse_only=only_article)
+def publish_to_redis(channel, message):
+    r = redis.Redis(
+        host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", 6379))
+    )
+    r.publish(channel, message)
 
-    content_div = soup.select_one("div.story-news.article")
-    if not content_div:
-        return "[본문 없음]"
-    
-    paragraphs = content_div.find_all("p")
 
-    body = "\n".join([
-        p.get_text(strip=True)
-        for p in paragraphs if p.get_text(strip=True) and not p.get_text(strip=True).startswith("©")
-    ])
+def fetch_article_details(url):
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/125.0.0.0 Safari/537.36"
+        ),
+        "Referer": "https://www.google.com",
+    }
 
-    return body
+    res = requests.get(url, headers=headers)
+    res.raise_for_status()
+    soup = BeautifulSoup(res.text, "lxml")
 
-def check_new_rss_news():
-    try:
-        if os.path.exists(STATE_FILE):
-            with open(STATE_FILE, 'r') as f:
-                latest_ts_str = f.read().strip()
-                latest_published = time.strptime(latest_ts_str, "%a, %d %b %Y %H:%M:%S %z")
-        else:
-            latest_published = None
-    except Exception:
-        latest_published = None
+    # 대표 이미지
+    image = soup.select_one('meta[property="og:image"]')["content"]
 
-    feed = feedparser.parse(RSS_URL)
+    # 기사 본문 (HTML 태그 제거한 텍스트)
+    article = soup.select_one("article#dic_area").get_text(strip=True, separator="\n")
+
+    return image, article
+
+
+def convert_to_public_url(href):
+
+    parsed = urlparse(href)
+    params = parse_qs(parsed.query)
+    article_id = params.get("article_id", [""])[0]
+    office_id = params.get("office_id", [""])[0]
+    if article_id and office_id:
+        return f"https://n.news.naver.com/mnews/article/{office_id}/{article_id}"
+
+    return href
+
+
+def fetch_latest_news():
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/125.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Referer": "https://www.google.com/",
+        "DNT": "1",  # Do Not Track
+        "Upgrade-Insecure-Requests": "1",
+    }
+
+    res = requests.get(NEWS_URL, headers=headers)
+    res.raise_for_status()
+    soup = BeautifulSoup(res.text, "lxml")
+
+    # 마지막 크롤링 시각 읽기
+    last_time = None
+    if os.path.exists(LAST_CRAWLED_FILE):
+        with open(LAST_CRAWLED_FILE, "r") as f:
+            last_time = f.read().strip()
+
+    articles = soup.select("dl > dd.articleSummary")
     new_articles = []
 
-    for entry in feed.entries:
-        if latest_published is None or entry.published_parsed > latest_published:
-            new_articles.append(entry)
+    for article in articles:
+        title_tag = article.find_previous_sibling("dd", class_="articleSubject").a
+        title = title_tag.text.strip()
+        url = convert_to_public_url(title_tag["href"])
+        press = article.select_one(".press").text.strip()
+        wdate = article.select_one(".wdate").text.strip()  # 예: 2025-05-22 11:34
 
+        # 날짜 비교
+        if last_time is None or wdate > last_time:
+            new_articles.append(
+                {"title": title, "url": url, "press": press, "wdate": wdate}
+            )
+
+    # 새 뉴스가 있다면 저장하거나 로깅
     if new_articles:
-        latest_ts = new_articles[0].published
-        with open(STATE_FILE, 'w') as f:
-            f.write(latest_ts)
+        for article in new_articles[:5]:  # 상위 5개 기사만 처리
+            # 기사 본문과 이미지를 가져옴
+            image, article_text = fetch_article_details(article["url"])
 
-        for article in new_articles:
-            print(f"[{article.published}] {article.title} - {article.link}")
+            print(
+                f"[NEW] {article['wdate']} - {article['title']} ({article['press']}) - {article['url']}"
+            )
+            print(f"{article_text}\n")
 
-            body = extract_yna_article_body(article.link)
+            # Redis에 뉴스 제목을 publish
+            publish_to_redis("news_alert", article["title"])
 
-            print(f"\n--- 본문 ---\n{body}\n")  # 본문 앞부분만 출력
+        # 최신 뉴스 기준으로 last_time 갱신
+        latest_time = max(article["wdate"] for article in new_articles)
+        with open(LAST_CRAWLED_FILE, "w") as f:
+            f.write(latest_time)
     else:
-        print("새 뉴스 없음.")
+        print("\n-----------------------새 뉴스 없음!-----------------------\n")
+
+    return new_articles
+
 
 check_news_task = PythonOperator(
-    task_id='check_rss_news',
-    python_callable=check_new_rss_news,
+    task_id="check_rss_news",
+    python_callable=fetch_latest_news,
     dag=dag,
 )
