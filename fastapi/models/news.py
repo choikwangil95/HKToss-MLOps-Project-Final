@@ -15,6 +15,9 @@ class NewsModel(Base):
     url = Column(Text)  # url TEXT
     content = Column(Text)  # content TEXT
     embedding = Column(Vector(768))  # embedding VECTOR(768)
+    stocks = Column(
+        String
+    )  # stocks VARCHAR, 쉼표로 구분된 종목명들 (예: "삼성전자, SK하이닉스")
 
 
 class ReportModel(Base):

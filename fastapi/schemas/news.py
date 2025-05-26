@@ -10,13 +10,24 @@ class News(BaseModel):
     title: str
     url: Optional[str]
     content: str
+    stocks: Optional[str]
 
     class Config:
         orm_mode = True
 
 
-class NewsOut(News):
-    pass  # 현재는 추가 필드가 없으므로 그대로 둡니다.
+# stocks만 빼고
+class NewsOut(BaseModel):
+    news_id: str
+    date: Optional[date]
+    title: str
+    url: Optional[str]
+    content: str
+
+
+class NewsStock(BaseModel):
+    news_id: str
+    stocks: str
 
 
 class SimilarNews(BaseModel):

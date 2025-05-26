@@ -11,15 +11,16 @@ CREATE TABLE news (
   title TEXT,
   url TEXT,
   content TEXT,
-  embedding VECTOR(768)
+  embedding VECTOR(768),
+  stocks TEXT  -- 주식 종목을 저장하기 위한 컬럼
 );
 
 -- 테이블에 데이터가 없을 때만 CSV에서 데이터 COPY 수행
 DO $$
 BEGIN
     IF (SELECT COUNT(*) FROM news) = 0 THEN
-        COPY news(news_id, date, title, url, content, embedding)
-        FROM '/docker-entrypoint-initdb.d/news_with_embedding.csv'
+        COPY news(news_id, date, title, url, content, embedding, stocks)
+        FROM '/docker-entrypoint-initdb.d/news_with_embedding_stocks_formatted.csv'
         WITH (FORMAT csv, HEADER true);
     END IF;
 END $$;

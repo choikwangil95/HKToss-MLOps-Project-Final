@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import json
+from fastapi import HTTPException
 
 
 def get_news_list(db: Session, skip: int = 0, limit: int = 20):
@@ -167,3 +168,14 @@ def get_similar_past_reports(
             }
         )
     return results
+
+
+def find_stock_effected(db: Session, news_id: str):
+    news = db.query(NewsModel).filter(NewsModel.news_id == news_id).first()
+
+    if news is None:
+        return None
+
+    stocks = str(json.loads(news.stocks.encode("utf-8").decode("unicode_escape")))
+
+    return [{"news_id": news.news_id, "stocks": stocks}] if news.stocks else []

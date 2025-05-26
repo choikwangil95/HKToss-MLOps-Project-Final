@@ -1,7 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
-from schemas.news import News, NewsOut, SimilarNews, Report, PastReportsResponse
-from services.news import get_news_list, get_news_detail, find_news_similar, get_similar_past_reports
+from schemas.news import (
+    News,
+    NewsOut,
+    SimilarNews,
+    Report,
+    NewsStock,
+    PastReportsResponse,
+)
+from services.news import (
+    get_news_list,
+    get_news_detail,
+    find_news_similar,
+    get_similar_past_reports,
+    find_stock_effected,
+)
 from core.db import get_db
 from typing import List
 import json
@@ -51,9 +64,9 @@ def news_detail(
 
 
 @router.get(
-    "/{news_id}/similar",
+    "/{news_id}/similar-news",
     response_model=List[SimilarNews],
-    summary="유사 과거 뉴스 조회",
+    summary="뉴스 유사 과거 뉴스 조회",
     description="입력한 뉴스와 유사한 과거 뉴스를 조건에 따라 필터링하여 조회합니다.",
 )
 def similar_news(
@@ -80,13 +93,13 @@ def similar_news(
 @router.get(
     "/{news_id}/matched-reports",
     response_model=PastReportsResponse,
-    summary="해당 뉴스와 유사한 리포트 매칭",
-    description="특정 뉴스와 유사한 증권사 리포트를 조회합니다."
+    summary="뉴스 관련 증권사 리포트 조회",
+    description="특정 뉴스와 유사한 증권사 리포트를 조회합니다.",
 )
 def matched_reports(
     news_id: str = Path(..., description="뉴스 고유 ID"),
     topk: int = Query(5, description="리포트 Top-K 개수"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     news = db.query(NewsModel).filter(NewsModel.news_id == news_id).first()
     if not news or news.embedding is None or news.date is None:
@@ -101,5 +114,23 @@ def matched_reports(
     news_embedding = news_embedding.reshape(1, -1)
 
     # news.date 전달
-    results = get_similar_past_reports(db, news_embedding, news.date, topk=topk, date_margin=90)
+    results = get_similar_past_reports(
+        db, news_embedding, news.date, topk=topk, date_margin=90
+    )
     return {"results": results}
+
+
+@router.get(
+    "/{news_id}/matched-stocks",
+    response_model=List[NewsStock],
+    summary="뉴스 관련 주식 종목 조회",
+    description="특정 뉴스와 관련된 주식 종목을 조회합니다.",
+)
+def matched_stock(
+    news_id: str = Path(..., description="뉴스 고유 ID"), db: Session = Depends(get_db)
+):
+    """
+    특정 뉴스와 관련된 주식 종목을 조회합니다.
+    """
+
+    return find_stock_effected(db, news_id)
