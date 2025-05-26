@@ -1,5 +1,6 @@
 [core]
     remote = myremote
+    autostage = true
 ['remote "myremote"']
     url = s3://hktoss-mlops-final/dvc_store
     endpointurl = https://s3.ap-northeast-2.amazonaws.com

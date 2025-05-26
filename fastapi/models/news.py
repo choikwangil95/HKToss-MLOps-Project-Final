@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Date, Text, Integer
+from sqlalchemy import Column, String, Date, Text, Integer, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 from pgvector.sqlalchemy import Vector
 
@@ -16,7 +16,7 @@ class NewsModel(Base):
     content = Column(Text)  # content TEXT
     embedding = Column(Vector(768))  # embedding VECTOR(768)
     stocks = Column(
-        String
+        ARRAY(String)
     )  # stocks VARCHAR, 쉼표로 구분된 종목명들 (예: "삼성전자, SK하이닉스")
 
 

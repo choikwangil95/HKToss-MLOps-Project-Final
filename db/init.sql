@@ -20,7 +20,7 @@ DO $$
 BEGIN
     IF (SELECT COUNT(*) FROM news) = 0 THEN
         COPY news(news_id, date, title, url, content, embedding, stocks)
-        FROM '/docker-entrypoint-initdb.d/news_with_embedding_stocks_formatted.csv'
+        FROM '/docker-entrypoint-initdb.d/news_3y.csv'
         WITH (FORMAT csv, HEADER true);
     END IF;
 END $$;

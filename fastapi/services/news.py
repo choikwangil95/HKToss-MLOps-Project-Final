@@ -176,6 +176,6 @@ def find_stock_effected(db: Session, news_id: str):
     if news is None:
         return None
 
-    stocks = str(json.loads(news.stocks.encode("utf-8").decode("unicode_escape")))
+    stocks = "".join(news.stocks)
 
     return [{"news_id": news.news_id, "stocks": stocks}] if news.stocks else []
