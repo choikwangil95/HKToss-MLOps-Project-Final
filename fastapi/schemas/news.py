@@ -1,7 +1,8 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, date
-from typing import List , Union
+from typing import List, Union
+
 
 class News(BaseModel):
     news_id: str
@@ -26,6 +27,7 @@ class SimilarNews(BaseModel):
     url: str
     similarity: float
 
+
 class Report(BaseModel):
     report_id: Optional[int]
     stock_name: str
@@ -38,9 +40,11 @@ class Report(BaseModel):
     opinion: str
     report_content: str
     embedding: Optional[List[float]] = []
+    similarity: Optional[float] = None
 
     class Config:
         orm_mode = True
+
 
 class PastReportsResponse(BaseModel):
     results: List[Report]

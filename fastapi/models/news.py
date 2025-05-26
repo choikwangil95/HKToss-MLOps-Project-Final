@@ -16,10 +16,13 @@ class NewsModel(Base):
     content = Column(Text)  # content TEXT
     embedding = Column(Vector(768))  # embedding VECTOR(768)
 
+
 class ReportModel(Base):
     __tablename__ = "reports"
 
-    report_id = Column(Integer, primary_key=True, autoincrement=True)  # PK, 없으면 추가!
+    report_id = Column(
+        Integer, primary_key=True, autoincrement=True
+    )  # PK, 없으면 추가!
     stock_name = Column(String)
     title = Column(Text)
     sec_firm = Column(String)

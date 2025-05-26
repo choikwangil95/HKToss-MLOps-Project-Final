@@ -109,9 +109,15 @@ def find_news_similar(
 
     return result
 
+
 # 과거 뉴스-리포트 매칭 (유사도 top-k)
 def get_similar_past_reports(
-    db: Session, news_embedding: np.ndarray, news_date, topk: int = 5, min_similarity: float = 0.0, date_margin: int = 90
+    db: Session,
+    news_embedding: np.ndarray,
+    news_date,
+    topk: int = 5,
+    min_similarity: float = 0.0,
+    date_margin: int = 90,
 ):
     # 1. 임베딩이 있고 날짜가 있는 리포트만 조회
     report_qs = db.query(ReportModel).all()
@@ -134,6 +140,7 @@ def get_similar_past_reports(
 
     embeddings = np.stack(candidate_embeddings)
     sims = cosine_similarity(news_embedding.reshape(1, -1), embeddings)[0]
+
     # 유사도 내림차순 topk
     top_indices = sims.argsort()[::-1][:topk]
 
@@ -144,19 +151,19 @@ def get_similar_past_reports(
         emb = r.embedding if r.embedding is not None else []
         if isinstance(emb, np.ndarray):
             emb = emb.tolist()
-        results.append({
-            "report_id": r.report_id,
-            "stock_name": r.stock_name,
-            "title": r.title,
-            "sec_firm": r.sec_firm,
-            "date": r.date.strftime("%Y-%m-%d"),
-            "view_count": r.view_count,
-            "url": r.url,
-            "target_price": target_price,
-            "opinion": r.opinion,
-            "report_content": r.report_content,
-            "similarity": float(sims[idx])
-        })
+        results.append(
+            {
+                "report_id": r.report_id,
+                "stock_name": r.stock_name,
+                "title": r.title,
+                "sec_firm": r.sec_firm,
+                "date": r.date.strftime("%Y-%m-%d"),
+                "view_count": r.view_count,
+                "url": r.url,
+                "target_price": target_price,
+                "opinion": r.opinion,
+                "report_content": r.report_content,
+                "similarity": float(sims[idx]),
+            }
+        )
     return results
-
-

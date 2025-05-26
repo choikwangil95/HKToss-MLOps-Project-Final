@@ -184,6 +184,3 @@ cython_debug/
 
 # 뉴스 데이터 제외
 datas/mk_news_with_id.csv
-
-# 뉴스-리포트 데이터 제외
-datas/news(24-25)_with_embeddings.csv
