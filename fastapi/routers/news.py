@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from schemas.news import (
     News,
@@ -30,7 +31,7 @@ router = APIRouter(
 @router.get(
     "/",
     response_model=list[NewsOut],
-    summary="뉴스 리스트 조회",
+    summary="[완료] 뉴스 목록 조회",
     description="최신 뉴스 기사를 페이지 단위로 조회합니다.",
 )
 def list_news(
@@ -48,9 +49,26 @@ def list_news(
 
 
 @router.get(
+    "/highlights",
+    response_model=list[NewsOut],
+    summary="[예정] 주요 뉴스 목록 조회",
+    description="주요 뉴스 기사를 조회합니다.",
+    include_in_schema=True,
+)
+def get_highlighted_news():
+    """
+    주요 뉴스 목록을 조회합니다.
+    """
+    return JSONResponse(
+        status_code=501,
+        content={"message": "주요 뉴스 목록 조회 API는 현재 준비 중입니다."},
+    )
+
+
+@router.get(
     "/{news_id}",
     response_model=NewsOut,
-    summary="뉴스 상세 조회",
+    summary="[완료] 뉴스 상세 조회",
     description="뉴스 ID를 기반으로 해당 뉴스 기사의 상세 정보를 조회합니다.",
 )
 def news_detail(
@@ -64,9 +82,9 @@ def news_detail(
 
 
 @router.get(
-    "/{news_id}/similar-news",
+    "/{news_id}/related/news",
     response_model=List[SimilarNews],
-    summary="뉴스 유사 과거 뉴스 조회",
+    summary="[완료] 뉴스 관련 과거 유사 뉴스 조회",
     description="입력한 뉴스와 유사한 과거 뉴스를 조건에 따라 필터링하여 조회합니다.",
 )
 def similar_news(
@@ -91,9 +109,9 @@ def similar_news(
 
 
 @router.get(
-    "/{news_id}/matched-reports",
+    "/{news_id}/related/reports",
     response_model=PastReportsResponse,
-    summary="뉴스 관련 증권사 리포트 조회",
+    summary="[완료] 뉴스 관련 증권사 리포트 조회",
     description="특정 뉴스와 유사한 증권사 리포트를 조회합니다.",
 )
 def matched_reports(
@@ -121,9 +139,9 @@ def matched_reports(
 
 
 @router.get(
-    "/{news_id}/matched-stocks",
+    "/{news_id}/related/stocks",
     response_model=List[NewsStock],
-    summary="뉴스 관련 주식 종목 조회",
+    summary="[완료] 뉴스 관련 주식 종목 조회",
     description="특정 뉴스와 관련된 주식 종목을 조회합니다.",
 )
 def matched_stock(
