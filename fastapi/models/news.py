@@ -1,6 +1,7 @@
-from sqlalchemy import Column, String, Date, Text
+from sqlalchemy import Column, String, Date, Text, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from pgvector.sqlalchemy import Vector
+
 
 Base = declarative_base()
 
@@ -14,3 +15,18 @@ class NewsModel(Base):
     url = Column(Text)  # url TEXT
     content = Column(Text)  # content TEXT
     embedding = Column(Vector(768))  # embedding VECTOR(768)
+
+class ReportModel(Base):
+    __tablename__ = "reports"
+
+    report_id = Column(Integer, primary_key=True, autoincrement=True)  # PK, 없으면 추가!
+    stock_name = Column(String)
+    title = Column(Text)
+    sec_firm = Column(String)
+    date = Column(Date)
+    view_count = Column(Integer)
+    url = Column(Text)
+    target_price = Column(String)  # 쉼표포함 가격 - String
+    opinion = Column(String)
+    report_content = Column(Text)
+    embedding = Column(Vector(768))

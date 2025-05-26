@@ -16,7 +16,7 @@ __pycache__/
 *.json
 data/
 ml_models/
-db/
+#db/
 initdb/
 
 # Git

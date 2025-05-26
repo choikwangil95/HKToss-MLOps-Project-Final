@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
-from schemas.news import News, NewsOut, SimilarNews
-from services.news import get_news_list, get_news_detail, find_news_similar
+from schemas.news import News, NewsOut, SimilarNews, Report, PastReportsResponse
+from services.news import get_news_list, get_news_detail, find_news_similar, get_similar_past_reports
 from core.db import get_db
 from typing import List
+import json
+import numpy as np
+from models.news import NewsModel
+
 
 router = APIRouter(
     prefix="/news", tags=["News"], responses={404: {"description": "Not found"}}
@@ -71,3 +75,31 @@ def similar_news(
     - 유사 뉴스끼리는 `{min_gap_between}`일 이상 떨어져 있어야 함
     """
     return find_news_similar(db, news_id, top_n, min_gap_days, min_gap_between)
+
+
+@router.get(
+    "/{news_id}/matched-reports",
+    response_model=PastReportsResponse,
+    summary="해당 뉴스와 유사한 리포트 매칭",
+    description="특정 뉴스와 유사한 증권사 리포트를 조회합니다."
+)
+def matched_reports(
+    news_id: str = Path(..., description="뉴스 고유 ID"),
+    topk: int = Query(5, description="리포트 Top-K 개수"),
+    db: Session = Depends(get_db)
+):
+    news = db.query(NewsModel).filter(NewsModel.news_id == news_id).first()
+    if not news or news.embedding is None or news.date is None:
+        raise HTTPException(status_code=404, detail="뉴스 혹은 임베딩/날짜 없음")
+
+    embedding = news.embedding
+    # 임베딩 타입(str or list/array) 체크
+    if isinstance(embedding, str):
+        news_embedding = np.array(json.loads(embedding))
+    else:
+        news_embedding = np.array(embedding)
+    news_embedding = news_embedding.reshape(1, -1)
+
+    # news.date 전달
+    results = get_similar_past_reports(db, news_embedding, news.date, topk=topk, date_margin=90)
+    return {"results": results}
