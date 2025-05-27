@@ -14,7 +14,7 @@ from fastapi import HTTPException
 def get_news_list(db: Session, skip: int = 0, limit: int = 20):
     news_list = (
         db.query(NewsModel)
-        .order_by(desc(NewsModel.date))
+        .order_by(desc(NewsModel.news_id))  # news_id 기준 내림차순 정렬
         .offset(skip)
         .limit(limit)
         .all()
