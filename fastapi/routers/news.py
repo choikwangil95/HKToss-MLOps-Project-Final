@@ -19,6 +19,7 @@ from services.news import (
 from core.db import get_db
 from typing import List
 import json
+from typing import Optional
 import numpy as np
 from models.news import NewsModel
 
@@ -37,6 +38,11 @@ router = APIRouter(
 def list_news(
     skip: int = Query(0, description="건너뛸 뉴스 개수 (페이지네이션용)", ge=0),
     limit: int = Query(20, description="가져올 뉴스 개수", le=100),
+    title: Optional[str] = Query(
+        None, description="뉴스 제목 필터링 (부분 일치)", max_length=20
+    ),
+    start_date: Optional[str] = Query(None, description="시작 날짜 (예: 2025-05-01)"),
+    end_date: Optional[str] = Query(None, description="종료 날짜 (예: 2025-05-31)"),
     db: Session = Depends(get_db),
 ):
     """
@@ -44,8 +50,18 @@ def list_news(
 
     - `skip`: 건너뛸 뉴스 수 (기본값: 0)
     - `limit`: 최대 뉴스 수 (기본값: 20)
+    - `title`: 뉴스 제목으로 필터링 (부분 일치)
+    - `start_date`: 조회 시작 날짜 (형식: YYYY-MM-DD)
+    - `end_date`: 조회 종료 날짜 (형식: YYYY-MM-DD)
     """
-    return get_news_list(db, skip, limit)
+    return get_news_list(
+        db,
+        skip=skip,
+        limit=limit,
+        title=title,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 @router.get(
