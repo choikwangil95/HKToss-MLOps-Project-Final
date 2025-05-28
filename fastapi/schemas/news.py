@@ -27,7 +27,7 @@ class NewsOut(BaseModel):
 
 class NewsStock(BaseModel):
     news_id: str
-    stocks: str
+    stocks: List[str]
 
 
 class SimilarNews(BaseModel):

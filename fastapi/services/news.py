@@ -9,6 +9,7 @@ import numpy as np
 from typing import Optional
 import datetime
 import json
+import ast
 from fastapi import HTTPException
 
 
@@ -187,6 +188,8 @@ def find_stock_effected(db: Session, news_id: str):
     if news is None:
         return None
 
+    # str 타입의 stocks를 리스트로 변환
     stocks = "".join(news.stocks)
+    stocks = ast.literal_eval(stocks) if isinstance(stocks, str) else stocks
 
     return [{"news_id": news.news_id, "stocks": stocks}] if news.stocks else []
