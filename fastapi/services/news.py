@@ -6,19 +6,30 @@ from datetime import timedelta
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 import numpy as np
+from typing import Optional
 import datetime
 import json
 from fastapi import HTTPException
 
 
-def get_news_list(db: Session, skip: int = 0, limit: int = 20):
-    news_list = (
-        db.query(NewsModel)
-        .order_by(desc(NewsModel.date))
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+def get_news_list(
+    db: Session,
+    skip: int = 0,
+    limit: int = 20,
+    title: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+):
+    query = db.query(NewsModel)
+
+    if title:
+        query = query.filter(NewsModel.title.ilike(f"%{title}%"))
+    if start_date:
+        query = query.filter(NewsModel.date >= start_date)
+    if end_date:
+        query = query.filter(NewsModel.date <= end_date)
+
+    news_list = query.order_by(desc(NewsModel.news_id)).offset(skip).limit(limit).all()
 
     return news_list
 
