@@ -1,0 +1,5 @@
+outs:
+- md5: a3acc1fe7c8d104cc5e4c80b7f515691
+  size: 275964936
+  hash: md5
+  path: news_2021_2023_with_stock_impact.csv
