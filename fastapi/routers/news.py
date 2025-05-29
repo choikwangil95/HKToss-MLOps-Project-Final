@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
+from datetime import datetime
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from schemas.news import (
     News,
+    News_v2,
     NewsOut,
+    NewsOut_v2,
     SimilarNews,
     Report,
     NewsStock,
@@ -11,7 +14,9 @@ from schemas.news import (
 )
 from services.news import (
     get_news_list,
+    get_news_list_v2,
     get_news_detail,
+    get_news_detail_v2,
     find_news_similar,
     get_similar_past_reports,
     find_stock_effected,
@@ -21,7 +26,7 @@ from typing import List
 import json
 from typing import Optional
 import numpy as np
-from models.news import NewsModel
+from models.news import NewsModel, NewsModel_v2
 
 
 router = APIRouter(
@@ -32,7 +37,7 @@ router = APIRouter(
 @router.get(
     "/",
     response_model=list[NewsOut],
-    summary="[완료] 뉴스 목록 조회",
+    summary="[완료] 뉴스 목록 조회 (test)",
     description="최신 뉴스 기사를 페이지 단위로 조회합니다.",
 )
 def list_news(
@@ -65,6 +70,42 @@ def list_news(
 
 
 @router.get(
+    "/v2",
+    response_model=list[NewsOut_v2],
+    summary="[완료] 뉴스 목록 조회 (production)",
+    description="최신 뉴스 기사를 페이지 단위로 조회합니다.",
+)
+def list_news_v2(
+    skip: int = Query(0, description="건너뛸 뉴스 개수 (페이지네이션용)", ge=0),
+    limit: int = Query(20, description="가져올 뉴스 개수", le=100),
+    title: Optional[str] = Query(
+        None, description="뉴스 제목 필터링 (부분 일치)", max_length=50
+    ),
+    start_datetime: Optional[datetime] = Query(
+        None, description="시작 일시 (예: 2025-05-01T00:00:00)"
+    ),
+    end_datetime: Optional[datetime] = Query(
+        None, description="종료 일시 (예: 2025-05-31T23:59:59)"
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    뉴스 목록을 조회합니다.
+    - `title`: 뉴스 제목 부분 일치
+    - `start_date`: 조회 시작 시각 (ISO 8601, 예: 2025-05-01T00:00:00)
+    - `end_date`: 조회 종료 시각 (ISO 8601, 예: 2025-05-31T23:59:59)
+    """
+    return get_news_list_v2(
+        db=db,
+        skip=skip,
+        limit=limit,
+        title=title,
+        start_datetime=start_datetime,
+        end_datetime=end_datetime,
+    )
+
+
+@router.get(
     "/highlights",
     response_model=list[NewsOut],
     summary="[예정] 주요 뉴스 목록 조회",
@@ -84,7 +125,7 @@ def get_highlighted_news():
 @router.get(
     "/{news_id}",
     response_model=NewsOut,
-    summary="[완료] 뉴스 상세 조회",
+    summary="[완료] 뉴스 상세 조회 (test)",
     description="뉴스 ID를 기반으로 해당 뉴스 기사의 상세 정보를 조회합니다.",
 )
 def news_detail(
@@ -95,6 +136,22 @@ def news_detail(
     특정 뉴스의 상세 정보를 조회합니다.
     """
     return get_news_detail(db, news_id)
+
+
+@router.get(
+    "/v2/{news_id}",
+    response_model=NewsOut_v2,
+    summary="[완료] 뉴스 상세 조회 (production)",
+    description="뉴스 ID를 기반으로 해당 뉴스 기사의 상세 정보를 조회합니다.",
+)
+def news_detail(
+    news_id: str = Path(..., description="뉴스 고유 ID"),
+    db: Session = Depends(get_db),
+):
+    """
+    특정 뉴스의 상세 정보를 조회합니다.
+    """
+    return get_news_detail_v2(db, news_id)
 
 
 @router.get(

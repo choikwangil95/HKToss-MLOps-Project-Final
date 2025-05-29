@@ -25,6 +25,29 @@ BEGIN
     END IF;
 END $$;
 
+
+-- news_v2 테이블 생성
+CREATE TABLE news_v2 (
+  news_id VARCHAR PRIMARY KEY,
+  wdate TIMESTAMP,
+  title TEXT,
+  article TEXT,
+  press TEXT,
+  url TEXT,
+  image TEXT
+);
+
+-- 테이블에 데이터가 없을 때만 CSV에서 데이터 COPY 수행
+DO $$
+BEGIN
+    IF (SELECT COUNT(*) FROM news_v2) = 0 THEN
+        COPY news_v2(news_id, wdate, title, article, press, url, image)
+        FROM '/docker-entrypoint-initdb.d/news_2023_2025.csv'
+        WITH (FORMAT csv, HEADER true);
+    END IF;
+END $$;
+
+
 -- reports 테이블 생성
 CREATE TABLE IF NOT EXISTS reports (
     report_id SERIAL PRIMARY KEY,

@@ -39,6 +39,36 @@ class SimilarNews(BaseModel):
     similarity: float
 
 
+#############################
+
+
+class News_v2(BaseModel):
+    news_id: str
+    wdate: Optional[datetime]
+    title: str
+    article: str
+    url: Optional[str]
+    press: str
+    image: str
+    stocks: Optional[str]
+
+    class Config:
+        orm_mode = True
+
+
+class NewsOut_v2(BaseModel):
+    news_id: str
+    wdate: Optional[datetime]
+    title: str
+    article: str
+    url: Optional[str]
+    press: str
+    image: str
+
+
+#############################
+
+
 class Report(BaseModel):
     report_id: Optional[int]
     stock_name: str

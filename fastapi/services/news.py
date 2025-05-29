@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from models.news import NewsModel, ReportModel
+from models.news import NewsModel, NewsModel_v2, ReportModel
 from schemas.news import News
 from datetime import timedelta
 from sklearn.metrics.pairwise import cosine_similarity
@@ -11,6 +11,7 @@ import datetime
 import json
 import ast
 from fastapi import HTTPException
+from datetime import datetime
 
 
 def get_news_list(
@@ -35,8 +36,42 @@ def get_news_list(
     return news_list
 
 
+def get_news_list_v2(
+    db: Session,
+    skip: int = 0,
+    limit: int = 20,
+    title: Optional[str] = None,
+    start_datetime: Optional[datetime] = None,
+    end_datetime: Optional[datetime] = None,
+):
+    query = db.query(NewsModel_v2)
+
+    if title:
+        query = query.filter(NewsModel_v2.title.ilike(f"%{title}%"))
+
+    if start_datetime:
+        query = query.filter(NewsModel_v2.wdate >= start_datetime)
+    if end_datetime:
+        query = query.filter(NewsModel_v2.wdate <= end_datetime)
+
+    news_list = (
+        query.order_by(desc(NewsModel_v2.news_id)).offset(skip).limit(limit).all()
+    )
+
+    return news_list
+
+
 def get_news_detail(db: Session, news_id: str):
     news = db.query(NewsModel).filter(NewsModel.news_id == news_id).first()
+
+    if news is None:
+        return None
+
+    return news
+
+
+def get_news_detail_v2(db: Session, news_id: str):
+    news = db.query(NewsModel_v2).filter(NewsModel_v2.news_id == news_id).first()
 
     if news is None:
         return None

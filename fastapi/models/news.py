@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Date, Text, Integer, ARRAY
+from sqlalchemy import Column, String, Date, Text, Integer, ARRAY, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from pgvector.sqlalchemy import Vector
 
@@ -18,6 +18,22 @@ class NewsModel(Base):
     stocks = Column(
         ARRAY(String)
     )  # stocks VARCHAR, 쉼표로 구분된 종목명들 (예: "삼성전자, SK하이닉스")
+
+
+class NewsModel_v2(Base):
+    __tablename__ = "news_v2"
+
+    news_id = Column(String, primary_key=True)  # VARCHAR PRIMARY KEY
+    wdate = Column(DateTime)  # date
+    title = Column(Text)  # title TEXT
+    url = Column(Text)  # url TEXT
+    article = Column(Text)  # content TEXT
+    press = Column(Text)
+    image = Column(Text)
+    # embedding = Column(Vector(768))  # embedding VECTOR(768)
+    # stocks = Column(
+    #     ARRAY(String)
+    # )  # stocks VARCHAR, 쉼표로 구분된 종목명들 (예: "삼성전자, SK하이닉스")
 
 
 class ReportModel(Base):
