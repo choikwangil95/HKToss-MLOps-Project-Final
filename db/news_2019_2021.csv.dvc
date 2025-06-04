@@ -1,0 +1,5 @@
+outs:
+- md5: 5437ad766edf295a1e0c2f9c2add00e9
+  size: 288805729
+  hash: md5
+  path: news_2019_2021.csv
