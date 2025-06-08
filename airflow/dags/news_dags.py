@@ -121,6 +121,10 @@ def fetch_latest_news():
 
     print(f"🧪 수집된 새 뉴스 개수: {len(new_articles)}")
 
+    print(f"🧪 new_articles 내용: {new_articles}")
+    print(f"🧪 각 기사 wdate: {[article['wdate'] for article in new_articles]}")
+
+
     # 새 뉴스가 있다면 저장하거나 로깅
     if new_articles:
         for article in new_articles[:5]:
