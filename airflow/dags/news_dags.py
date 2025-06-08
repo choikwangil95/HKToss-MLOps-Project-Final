@@ -117,8 +117,10 @@ def fetch_latest_news():
                 {"title": title, "url": url, "press": press, "wdate": wdate}
             )
 
+    print(f"🧪 수집된 새 뉴스 개수: {len(new_articles)}")
+
     # 새 뉴스가 있다면 저장하거나 로깅
-    if new_articles:
+    if len(new_articles) != 0:
         for article in new_articles[:5]:  # 상위 5개 기사만 처리
             # 기사 본문과 이미지를 가져옴
             image, article_text = fetch_article_details(article["url"])
