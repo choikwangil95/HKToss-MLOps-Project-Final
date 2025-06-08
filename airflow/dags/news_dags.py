@@ -7,6 +7,7 @@ import os
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 import time
+import sys
 # import redis
 
 default_args = {
@@ -127,17 +128,6 @@ def fetch_latest_news():
 
     # 새 뉴스가 있다면 저장하거나 로깅
     if new_articles:
-        for article in new_articles[:5]:
-            try:
-                image, article_text = fetch_article_details(article["url"])
-                print(
-                    f"[NEW] {article['wdate']} - {article['title']} ({article['press']}) - {article['url']}"
-                )
-                print(f"{article_text[:300]}...\n")  # 너무 긴 경우 생략
-            except Exception as e:
-                print(f"❌ 기사 내용 파싱 실패: {e}")
-                continue
-
         try:
             latest_time = max(parse_wdate(article["wdate"]) for article in new_articles)
             if not os.path.exists(os.path.dirname(LAST_CRAWLED_FILE)):
@@ -146,10 +136,28 @@ def fetch_latest_news():
             print(f"🧪 last_time: {last_time}")
             print(f"🧪 최신 뉴스 시간: {latest_time}")
 
+            sys.stdout.flush()
+
             with open(LAST_CRAWLED_FILE, "w") as f:
                 f.write(latest_time.strftime("%Y-%m-%d %H:%M"))
         except Exception as e:
             print(f"❌ 마지막 시간 기록 실패: {e}")
+            
+        for article in new_articles[:5]:
+            try:
+                print(f"\n 기사 처리 중: {article['title']}")
+                image, article_text = fetch_article_details(article["url"])
+
+                print(
+                    f"[NEW] {article['wdate']} - {article['title']} ({article['press']}) - {article['url']}"
+                )
+                print(f"{article_text[:300]}...\n")  # 너무 긴 경우 생략
+
+                time.sleep(0.5)  # 0.5초 정도만 쉬어도 안정성 증가
+            except Exception as e:
+                print(f"❌ 기사 내용 파싱 실패: {e}")
+                continue
+
     else:
         print("\n-----------------------새 뉴스 없음!-----------------------\n")
 
