@@ -2,185 +2,173 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 import requests
-from bs4 import SoupStrainer
-import os
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
-import time
+import os
+import random
 import sys
-# import redis
+import time
+
+# 기본 설정
+NEWS_URL = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=402"
+LAST_CRAWLED_FILE = "/opt/airflow/data/last_crawled.txt"
 
 default_args = {
     "owner": "airflow",
     "start_date": datetime(2025, 5, 13),
     "retries": 0,
-    # "retry_delay": timedelta(seconds=30),
 }
 
 dag = DAG(
     dag_id="rss_news_monitor",
     default_args=default_args,
-    schedule_interval="* * * * *",  # 매 1분
+    schedule_interval="* * * * *",
     catchup=False,
     description="네이버페이 증권 종목 뉴스에서 새 뉴스 수집",
 )
 
-NEWS_URL = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=402"
-LAST_CRAWLED_FILE = "/opt/airflow/data/last_crawled.txt"
+# ────────────────────────────────────────────────
+# 📌 유틸 함수
+# ────────────────────────────────────────────────
 
-if os.path.exists(LAST_CRAWLED_FILE):
-    print(f"📁 파일 존재함: {LAST_CRAWLED_FILE}")
-    with open(LAST_CRAWLED_FILE, "r") as f:
-        last_time = f.read().strip()
-else:
-    print(f"📁 파일 없음: {LAST_CRAWLED_FILE}")
-
-
-# def publish_to_redis(channel, message):
-#     r = redis.Redis(
-#         host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", 6379))
-#     )
-#     r.publish(channel, message)
-
-
-def fetch_article_details(url):
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/125.0.0.0 Safari/537.36"
-        ),
-        "Referer": "https://www.google.com",
-    }
-
-    res = requests.get(url, headers=headers)
-    res.raise_for_status()
-    soup = BeautifulSoup(res.text, "lxml")
-
-    # 대표 이미지
-    image = soup.select_one('meta[property="og:image"]')["content"]
-
-    # 기사 본문 (HTML 태그 제거한 텍스트)
-    article = soup.select_one("article#dic_area").get_text(strip=True, separator="\n")
-
-    return image, article
-
+def parse_wdate(text):
+    return datetime.strptime(text, "%Y-%m-%d %H:%M")
 
 def convert_to_public_url(href):
-
     parsed = urlparse(href)
     params = parse_qs(parsed.query)
     article_id = params.get("article_id", [""])[0]
     office_id = params.get("office_id", [""])[0]
     if article_id and office_id:
         return f"https://n.news.naver.com/mnews/article/{office_id}/{article_id}"
-
     return href
 
-def parse_wdate(text):
-    return datetime.strptime(text, "%Y-%m-%d %H:%M")
+def get_random_headers():
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+        "(KHTML, like Gecko) Version/15.1 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 "
+        "(KHTML, like Gecko) Version/14.0 Mobile/15A372 Safari/604.1",
+    ]
 
-def fetch_latest_news():
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/125.0.0.0 Safari/537.36"
-        ),
+    return {
+        "User-Agent": random.choice(user_agents),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
         "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive",
         "Referer": "https://www.google.com/",
-        "DNT": "1",  # Do Not Track
+        "DNT": "1",
         "Upgrade-Insecure-Requests": "1",
     }
 
-    res = requests.get(NEWS_URL, headers=headers)
+
+def fetch_article_details(url):
+    headers = get_random_headers()
+    res = requests.get(url, headers=headers)
     res.raise_for_status()
     soup = BeautifulSoup(res.text, "lxml")
+    image = soup.select_one('meta[property="og:image"]')["content"]
+    article = soup.select_one("article#dic_area").get_text(strip=True, separator="\n")
+    return image, article
 
-    if not os.path.exists(os.path.dirname(LAST_CRAWLED_FILE)):
-        os.makedirs(os.path.dirname(LAST_CRAWLED_FILE), exist_ok=True)
-
-    if os.path.exists(LAST_CRAWLED_FILE):
-        print(f"📁 파일 존재함: {LAST_CRAWLED_FILE}")
-        with open(LAST_CRAWLED_FILE, "r") as f:
+def get_or_create_last_time(filepath: str) -> str:
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    
+    if os.path.exists(filepath):
+        with open(filepath, "r") as f:
             last_time = f.read().strip()
-
-        print(f"🧪 last_time: {last_time}")
-
+        if last_time:
+            print(f"🧪 이전 기록된 시간: {last_time}")
+            return last_time
+        else:
+            print(f"📁 파일은 있지만 내용 없음 → 현재시각 기록")
     else:
-        print(f"📁 파일 없음: {LAST_CRAWLED_FILE}")
+        print(f"📁 파일 없음 → 생성 후 현재시각 기록")
 
-    # 마지막 크롤링 시각 읽기
-    last_time = None
-    if os.path.exists(LAST_CRAWLED_FILE):
-        with open(LAST_CRAWLED_FILE, "r") as f:
-            last_time = f.read().strip()
+    # 파일 없거나 내용이 비어있으면 현재 시간으로 초기화
+    try:
+        with open(filepath, "w") as f:
+            f.write(now_str)
+    except Exception as e:
+        print(f"❌ 시간 기록 실패: {type(e).__name__}: {e}")
+    return now_str
 
-    print(f"🧪 last_time: {last_time}")
+def save_latest_time(filepath: str, time_str: str):
+    try:
+        with open(filepath, "w") as f:
+            f.write(time_str)
+        print(f"✅ 최신 시간 저장: {time_str}")
+    except Exception as e:
+        print(f"❌ 시간 저장 실패: {type(e).__name__}: {e}")
+
+# ────────────────────────────────────────────────
+# 📌 뉴스 수집 메인 함수
+# ────────────────────────────────────────────────
+
+def fetch_latest_news():
+    headers = headers = get_random_headers()
+
+    try:
+        res = requests.get(NEWS_URL, headers=headers)
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text, "lxml")
+    except Exception as e:
+        print(f"❌ 뉴스 페이지 요청 실패: {type(e).__name__}: {e}")
+        return []
+
+    last_time = get_or_create_last_time(LAST_CRAWLED_FILE)
+    last_time_dt = parse_wdate(last_time)
 
     articles = soup.select("dl > dd.articleSummary")
     new_articles = []
 
     for article in articles:
-        title_tag = article.find_previous_sibling("dd", class_="articleSubject").a
-        title = title_tag.text.strip()
-        url = convert_to_public_url(title_tag["href"])
-        press = article.select_one(".press").text.strip()
-        wdate = article.select_one(".wdate").text.strip()  # 예: 2025-05-22 11:34
-
-        # 날짜 비교
-        last_time_dt = parse_wdate(last_time) if last_time else None
-        article_time_dt = parse_wdate(wdate)
-
-        if last_time_dt is None or article_time_dt > last_time_dt:
-            new_articles.append(
-                {"title": title, "url": url, "press": press, "wdate": wdate}
-            )
-
-    print(f"🧪 수집된 새 뉴스 개수: {len(new_articles)}")
-
-    print(f"🧪 new_articles 내용: {new_articles}")
-    print(f"🧪 각 기사 wdate: {[article['wdate'] for article in new_articles]}")
-
-
-    # 새 뉴스가 있다면 저장하거나 로깅
-    if new_articles:
         try:
-            latest_time = max(parse_wdate(article["wdate"]) for article in new_articles)
+            title_tag = article.find_previous_sibling("dd", class_="articleSubject").a
+            title = title_tag.text.strip()
+            url = convert_to_public_url(title_tag["href"])
+            press = article.select_one(".press").text.strip()
+            wdate = article.select_one(".wdate").text.strip()
+            article_time_dt = parse_wdate(wdate)
 
-            print(f"🧪 last_time: {last_time}")
-            print(f"🧪 최신 뉴스 시간: {latest_time}")
+            if article_time_dt > last_time_dt:
+                new_articles.append({
+                    "title": title, "url": url, "press": press, "wdate": wdate
+                })
 
-            sys.stdout.flush()
-
-            with open(LAST_CRAWLED_FILE, "w") as f:
-                f.write(latest_time.strftime("%Y-%m-%d %H:%M"))
         except Exception as e:
-            print(f"❌ 마지막 시간 기록 실패: {e}")
+            print(f"❌ 뉴스 파싱 실패: {type(e).__name__}: {e}")
+            continue
+
+    print(f"🧪 새 뉴스 수: {len(new_articles)}")
+
+    if new_articles:
+        latest_time = max(parse_wdate(article["wdate"]) for article in new_articles)
+        save_latest_time(LAST_CRAWLED_FILE, latest_time.strftime("%Y-%m-%d %H:%M"))
 
         for article in new_articles[:5]:
             try:
-                print(f"\n 기사 처리 중: {article['title']}")
+                print(f"\n📰 기사 처리 중: {article['title']}")
                 image, article_text = fetch_article_details(article["url"])
-
-                print(
-                    f"[NEW] {article['wdate']} - {article['title']} ({article['press']}) - {article['url']}"
-                )
-                print(f"{article_text[:300]}...\n")  # 너무 긴 경우 생략
-
-                time.sleep(0.5)  # 0.5초 정도만 쉬어도 안정성 증가
+                print(f"[NEW] {article['wdate']} - {article['title']} ({article['press']})")
+                print(f"{article_text[:300]}...\n")
+                time.sleep(0.5)
             except Exception as e:
-                print(f"❌ 기사 내용 파싱 실패: {e}")
+                print(f"❌ 기사 본문 파싱 실패: {type(e).__name__}: {e}")
                 continue
-
     else:
-        print("\n-----------------------새 뉴스 없음!-----------------------\n")
+        print("⏰ 새 뉴스 없음")
 
     return new_articles
 
+# ────────────────────────────────────────────────
+# 📌 DAG 등록
+# ────────────────────────────────────────────────
 
 check_news_task = PythonOperator(
     task_id="check_rss_news",
