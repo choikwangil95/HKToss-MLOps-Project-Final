@@ -2,13 +2,12 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 import requests
-from bs4 import BeautifulSoup
 from bs4 import SoupStrainer
 import os
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 import time
-import redis
+# import redis
 
 default_args = {
     "owner": "airflow",
@@ -26,14 +25,14 @@ dag = DAG(
 )
 
 NEWS_URL = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=402"
-LAST_CRAWLED_FILE = "/opt/airflow/last_crawled.txt"
+LAST_CRAWLED_FILE = "/tmp/last_crawled.txt"
 
 
-def publish_to_redis(channel, message):
-    r = redis.Redis(
-        host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", 6379))
-    )
-    r.publish(channel, message)
+# def publish_to_redis(channel, message):
+#     r = redis.Redis(
+#         host=os.getenv("REDIS_HOST", "redis"), port=int(os.getenv("REDIS_PORT", 6379))
+#     )
+#     r.publish(channel, message)
 
 
 def fetch_article_details(url):
@@ -70,6 +69,8 @@ def convert_to_public_url(href):
 
     return href
 
+def parse_wdate(text):
+    return datetime.strptime(text, "%Y-%m-%d %H:%M")
 
 def fetch_latest_news():
     headers = {
@@ -108,7 +109,10 @@ def fetch_latest_news():
         wdate = article.select_one(".wdate").text.strip()  # 예: 2025-05-22 11:34
 
         # 날짜 비교
-        if last_time is None or wdate > last_time:
+        last_time_dt = parse_wdate(last_time) if last_time else None
+        article_time_dt = parse_wdate(wdate)
+
+        if last_time_dt is None or article_time_dt > last_time_dt:
             new_articles.append(
                 {"title": title, "url": url, "press": press, "wdate": wdate}
             )
@@ -125,12 +129,19 @@ def fetch_latest_news():
             print(f"{article_text}\n")
 
             # Redis에 뉴스 제목을 publish
-            publish_to_redis("news_alert", article["title"])
+            # publish_to_redis("news_alert", article["title"])
 
         # 최신 뉴스 기준으로 last_time 갱신
         latest_time = max(article["wdate"] for article in new_articles)
+
+        if not os.path.exists(os.path.dirname(LAST_CRAWLED_FILE)):
+            os.makedirs(os.path.dirname(LAST_CRAWLED_FILE), exist_ok=True)
+
+        print(f"🧪 last_time: {last_time}")
+        print(f"🧪 parsed article time: {wdate}")
+
         with open(LAST_CRAWLED_FILE, "w") as f:
-            f.write(latest_time)
+            f.write(latest_time.strftime("%Y-%m-%d %H:%M"))
     else:
         print("\n-----------------------새 뉴스 없음!-----------------------\n")
 
