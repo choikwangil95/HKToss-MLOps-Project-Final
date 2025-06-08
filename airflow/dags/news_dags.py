@@ -9,6 +9,7 @@ import random
 import time
 import concurrent.futures
 import logging
+from requests.adapters import HTTPAdapter, Retry
 
 log = logging.getLogger(__name__)
 
@@ -78,11 +79,19 @@ def safe_soup_parse(text, timeout=3):
             log.error(f"❌ soup 파싱 실패: {type(e).__name__}: {e}")
             return None
 
+def get_retry_session():
+    session = requests.Session()
+    retries = Retry(total=3, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504])
+    session.mount("https://", HTTPAdapter(max_retries=retries))
+    return session
+
 def fetch_article_details(url):
     try:
         headers = get_random_headers()
         log.info(f"📰 요청 URL: {url}")
-        res = requests.get(url, headers=headers, timeout=10)
+
+        session = get_retry_session()
+        res = session.get(url, headers=headers, timeout=10)
         log.info(f"📅 응답 상태 코드: {res.status_code}")
         res.raise_for_status()
         log.info(f"📄 응답 본문 길이: {len(res.text)}")
@@ -100,6 +109,10 @@ def fetch_article_details(url):
         article = article_tag.get_text(strip=True, separator="\n") if article_tag else ""
 
         log.info(f"✅ 추출 성공: 이미지 있음? {bool(image)}, 본문 길이: {len(article)}")
+
+        # 요청 사이에 무작위 대기
+        time.sleep(random.uniform(1.0, 2.5))
+
         return image, article
 
     except Exception as e:
@@ -184,7 +197,6 @@ def fetch_latest_news():
                 preview = article_text[:300] if isinstance(article_text, str) else ""
                 log.info(f"[NEW] {article['wdate']} - {article['title']} ({article['press']})")
                 log.info(f"{preview}...\n")
-                time.sleep(1)
             except Exception as e:
                 log.error(f"❌ 본문 파싱 실패 ({type(e).__name__}): {e}")
     else:
