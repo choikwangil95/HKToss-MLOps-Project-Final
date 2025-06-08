@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import news, status, stock
+from routers import news, status
 
 app = FastAPI(title="MLOps API Server", version="0.0.0")
 
