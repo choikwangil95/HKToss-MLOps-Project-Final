@@ -63,14 +63,19 @@ def get_random_headers():
 def fetch_article_details(url):
     try:
         res = requests.get(url, headers=get_random_headers(), timeout=10)
+        print(res)
+
         res.raise_for_status()
         soup = BeautifulSoup(res.text, "lxml")
+        print(soup)
 
         image_tag = soup.select_one('meta[property="og:image"]')
         image = image_tag["content"] if image_tag and image_tag.has_attr("content") else None
 
         article_tag = soup.select_one("article#dic_area")
         article = article_tag.get_text(strip=True, separator="\n") if article_tag else ""
+
+        print(f"=========={image},{article}")
 
         return image, article
 
