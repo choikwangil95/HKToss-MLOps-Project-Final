@@ -177,9 +177,13 @@ def fetch_latest_news():
             try:
                 print(f"\n📰 기사 처리 중: {article['title']}")
                 image, article_text = fetch_article_details(article["url"])
+
+                # 예외 방지용 안전 체크
+                preview = article_text[:300] if isinstance(article_text, str) else ""
                 print(f"[NEW] {article['wdate']} - {article['title']} ({article['press']})")
-                print(f"{article_text[:300]}...\n")
-                time.sleep(0.5)
+                print(f"{preview}...\n")
+
+                time.sleep(1)
             except Exception as e:
                 print(f"❌ 본문 파싱 실패 ({type(e).__name__}): {e}")
     else:
