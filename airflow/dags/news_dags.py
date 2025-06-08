@@ -7,7 +7,10 @@ from urllib.parse import urlparse, parse_qs
 import os
 import random
 import time
+import concurrent.futures
 import logging
+
+log = logging.getLogger(__name__)
 
 NEWS_URL = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=402"
 LAST_CRAWLED_FILE = "/opt/airflow/data/last_crawled.txt"
@@ -25,8 +28,6 @@ dag = DAG(
     catchup=False,
     description="네이버페이 증권 종목 뉴스에서 새 뉴스 수집",
 )
-
-log = logging.getLogger(__name__)
 
 # ──────────────────────────────
 # 📌 유틸 함수
@@ -62,16 +63,34 @@ def get_random_headers():
         "Upgrade-Insecure-Requests": "1",
     }
 
+def safe_soup_parse(text, timeout=3):
+    def parse():
+        return BeautifulSoup(text, "lxml")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(parse)
+        try:
+            return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            log.error("❌ soup 파싱 타임아웃 발생")
+            return None
+        except Exception as e:
+            log.error(f"❌ soup 파싱 실패: {type(e).__name__}: {e}")
+            return None
+
 def fetch_article_details(url):
     try:
         headers = get_random_headers()
-        log.info(f"\U0001F4F0 요청 URL: {url}")
+        log.info(f"📰 요청 URL: {url}")
         res = requests.get(url, headers=headers, timeout=10)
-        log.info(f"\U0001F4C5 응답 상태 코드: {res.status_code}")
+        log.info(f"📅 응답 상태 코드: {res.status_code}")
         res.raise_for_status()
-        log.info(f"\U0001F4C4 응답 본문 길이: {len(res.text)}")
+        log.info(f"📄 응답 본문 길이: {len(res.text)}")
 
-        soup = BeautifulSoup(res.text, "lxml")
+        soup = safe_soup_parse(res.text)
+        if soup is None:
+            return None, ""
+
         log.info("✅ soup 생성 완료")
 
         image_tag = soup.select_one('meta[property="og:image"]')
@@ -84,7 +103,7 @@ def fetch_article_details(url):
         return image, article
 
     except Exception as e:
-        log.error(f"❌ fetch_article_details 실패 ({type(e).__name__}): {e}")
+        log.error(f"❌ 전체 fetch 실패 - {url}: {type(e).__name__}: {e}")
         return None, ""
 
 def get_or_create_last_time(filepath: str) -> str:
