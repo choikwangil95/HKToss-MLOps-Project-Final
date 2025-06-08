@@ -98,6 +98,8 @@ def fetch_latest_news():
         with open(LAST_CRAWLED_FILE, "r") as f:
             last_time = f.read().strip()
 
+    print(f"🧪 last_time: {last_time}")
+
     articles = soup.select("dl > dd.articleSummary")
     new_articles = []
 
@@ -134,7 +136,7 @@ def fetch_latest_news():
             # publish_to_redis("news_alert", article["title"])
 
         # 최신 뉴스 기준으로 last_time 갱신
-        latest_time = max(article["wdate"] for article in new_articles)
+        latest_time = max(parse_wdate(article["wdate"]) for article in new_articles)
 
         if not os.path.exists(os.path.dirname(LAST_CRAWLED_FILE)):
             os.makedirs(os.path.dirname(LAST_CRAWLED_FILE), exist_ok=True)
