@@ -26,7 +26,14 @@ dag = DAG(
 )
 
 NEWS_URL = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=402"
-LAST_CRAWLED_FILE = "/tmp/last_crawled.txt"
+LAST_CRAWLED_FILE = "/opt/airflow/data/last_crawled.txt"
+
+if os.path.exists(LAST_CRAWLED_FILE):
+    print(f"📁 파일 존재함: {LAST_CRAWLED_FILE}")
+    with open(LAST_CRAWLED_FILE, "r") as f:
+        last_time = f.read().strip()
+else:
+    print(f"📁 파일 없음: {LAST_CRAWLED_FILE}")
 
 
 # def publish_to_redis(channel, message):
@@ -142,7 +149,7 @@ def fetch_latest_news():
                 f.write(latest_time.strftime("%Y-%m-%d %H:%M"))
         except Exception as e:
             print(f"❌ 마지막 시간 기록 실패: {e}")
-            
+
         for article in new_articles[:5]:
             try:
                 print(f"\n 기사 처리 중: {article['title']}")
