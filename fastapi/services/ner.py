@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import NewsModel 
+from models.news import NewsModel 
 from utils.ner_pipeline import load_ner_pipeline
 from utils.stock_dict import load_company_names
 from fastapi.utils.label import id2label
