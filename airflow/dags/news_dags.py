@@ -122,30 +122,30 @@ def fetch_latest_news():
     print(f"🧪 수집된 새 뉴스 개수: {len(new_articles)}")
 
     # 새 뉴스가 있다면 저장하거나 로깅
-    if len(new_articles) != 0:
-        for article in new_articles[:5]:  # 상위 5개 기사만 처리
-            # 기사 본문과 이미지를 가져옴
-            image, article_text = fetch_article_details(article["url"])
+    if new_articles:
+        for article in new_articles[:5]:
+            try:
+                image, article_text = fetch_article_details(article["url"])
+                print(
+                    f"[NEW] {article['wdate']} - {article['title']} ({article['press']}) - {article['url']}"
+                )
+                print(f"{article_text[:300]}...\n")  # 너무 긴 경우 생략
+            except Exception as e:
+                print(f"❌ 기사 내용 파싱 실패: {e}")
+                continue
 
-            print(
-                f"[NEW] {article['wdate']} - {article['title']} ({article['press']}) - {article['url']}"
-            )
-            print(f"{article_text}\n")
+        try:
+            latest_time = max(parse_wdate(article["wdate"]) for article in new_articles)
+            if not os.path.exists(os.path.dirname(LAST_CRAWLED_FILE)):
+                os.makedirs(os.path.dirname(LAST_CRAWLED_FILE), exist_ok=True)
 
-            # Redis에 뉴스 제목을 publish
-            # publish_to_redis("news_alert", article["title"])
+            print(f"🧪 last_time: {last_time}")
+            print(f"🧪 최신 뉴스 시간: {latest_time}")
 
-        # 최신 뉴스 기준으로 last_time 갱신
-        latest_time = max(parse_wdate(article["wdate"]) for article in new_articles)
-
-        if not os.path.exists(os.path.dirname(LAST_CRAWLED_FILE)):
-            os.makedirs(os.path.dirname(LAST_CRAWLED_FILE), exist_ok=True)
-
-        print(f"🧪 last_time: {last_time}")
-        print(f"🧪 parsed article time: {wdate}")
-
-        with open(LAST_CRAWLED_FILE, "w") as f:
-            f.write(latest_time.strftime("%Y-%m-%d %H:%M"))
+            with open(LAST_CRAWLED_FILE, "w") as f:
+                f.write(latest_time.strftime("%Y-%m-%d %H:%M"))
+        except Exception as e:
+            print(f"❌ 마지막 시간 기록 실패: {e}")
     else:
         print("\n-----------------------새 뉴스 없음!-----------------------\n")
 
