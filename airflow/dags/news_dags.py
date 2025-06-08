@@ -100,6 +100,19 @@ def fetch_latest_news():
     res.raise_for_status()
     soup = BeautifulSoup(res.text, "lxml")
 
+    if not os.path.exists(os.path.dirname(LAST_CRAWLED_FILE)):
+        os.makedirs(os.path.dirname(LAST_CRAWLED_FILE), exist_ok=True)
+
+    if os.path.exists(LAST_CRAWLED_FILE):
+        print(f"📁 파일 존재함: {LAST_CRAWLED_FILE}")
+        with open(LAST_CRAWLED_FILE, "r") as f:
+            last_time = f.read().strip()
+
+        print(f"🧪 last_time: {last_time}")
+
+    else:
+        print(f"📁 파일 없음: {LAST_CRAWLED_FILE}")
+
     # 마지막 크롤링 시각 읽기
     last_time = None
     if os.path.exists(LAST_CRAWLED_FILE):
@@ -137,8 +150,6 @@ def fetch_latest_news():
     if new_articles:
         try:
             latest_time = max(parse_wdate(article["wdate"]) for article in new_articles)
-            if not os.path.exists(os.path.dirname(LAST_CRAWLED_FILE)):
-                os.makedirs(os.path.dirname(LAST_CRAWLED_FILE), exist_ok=True)
 
             print(f"🧪 last_time: {last_time}")
             print(f"🧪 최신 뉴스 시간: {latest_time}")
