@@ -62,25 +62,38 @@ def get_random_headers():
 
 def fetch_article_details(url):
     try:
-        res = requests.get(url, headers=get_random_headers(), timeout=10)
-        print(res)
+        headers = get_random_headers()
+        print(f"📡 요청 URL: {url}")
+        res = requests.get(url, headers=headers, timeout=10)
+        print(f"📥 응답 상태 코드: {res.status_code}")
 
         res.raise_for_status()
-        soup = BeautifulSoup(res.text, "lxml")
-        print(soup)
 
-        image_tag = soup.select_one('meta[property="og:image"]')
-        image = image_tag["content"] if image_tag and image_tag.has_attr("content") else None
+        # 응답 길이 확인
+        print(f"📄 응답 본문 길이: {len(res.text)}")
 
-        article_tag = soup.select_one("article#dic_area")
-        article = article_tag.get_text(strip=True, separator="\n") if article_tag else ""
+        try:
+            soup = BeautifulSoup(res.text, "lxml")
+            print("✅ soup 생성 완료")
+        except Exception as e:
+            print(f"❌ soup 파싱 실패: {type(e).__name__}: {e}")
+            return None, ""
 
-        print(f"=========={image},{article}")
+        try:
+            image_tag = soup.select_one('meta[property="og:image"]')
+            image = image_tag["content"] if image_tag and image_tag.has_attr("content") else None
 
-        return image, article
+            article_tag = soup.select_one("article#dic_area")
+            article = article_tag.get_text(strip=True, separator="\n") if article_tag else ""
+
+            print(f"✅ 추출 성공: 이미지 있음? {bool(image)}, 본문 길이: {len(article)}")
+            return image, article
+        except Exception as e:
+            print(f"❌ soup 내부 요소 파싱 실패: {type(e).__name__}: {e}")
+            return None, ""
 
     except Exception as e:
-        print(f"❌ fetch_article_details 실패 ({type(e).__name__}): {e}")
+        print(f"❌ 전체 fetch 실패 - {url}: {type(e).__name__}: {e}")
         return None, ""
 
 def get_or_create_last_time(filepath: str) -> str:
