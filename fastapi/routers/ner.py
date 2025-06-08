@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path, HTTPException
 from sqlalchemy.orm import Session
 from schemas.ner import StockMatchResponse
-from services import match_stocks_by_news_id
+from services.ner import match_stocks_by_news_id
 from db import get_db  
 
 router = APIRouter()
