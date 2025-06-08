@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 import os
 import random
-import sys
 import time
+import logging
 
 NEWS_URL = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=402"
 LAST_CRAWLED_FILE = "/opt/airflow/data/last_crawled.txt"
@@ -25,6 +25,8 @@ dag = DAG(
     catchup=False,
     description="네이버페이 증권 종목 뉴스에서 새 뉴스 수집",
 )
+
+log = logging.getLogger(__name__)
 
 # ──────────────────────────────
 # 📌 유틸 함수
@@ -63,37 +65,26 @@ def get_random_headers():
 def fetch_article_details(url):
     try:
         headers = get_random_headers()
-        print(f"📡 요청 URL: {url}")
+        log.info(f"\U0001F4F0 요청 URL: {url}")
         res = requests.get(url, headers=headers, timeout=10)
-        print(f"📥 응답 상태 코드: {res.status_code}")
-
+        log.info(f"\U0001F4C5 응답 상태 코드: {res.status_code}")
         res.raise_for_status()
+        log.info(f"\U0001F4C4 응답 본문 길이: {len(res.text)}")
 
-        # 응답 길이 확인
-        print(f"📄 응답 본문 길이: {len(res.text)}")
+        soup = BeautifulSoup(res.text, "lxml")
+        log.info("✅ soup 생성 완료")
 
-        try:
-            soup = BeautifulSoup(res.text, "lxml")
-            print("✅ soup 생성 완료")
-        except Exception as e:
-            print(f"❌ soup 파싱 실패: {type(e).__name__}: {e}")
-            return None, ""
+        image_tag = soup.select_one('meta[property="og:image"]')
+        image = image_tag["content"] if image_tag and image_tag.has_attr("content") else None
 
-        try:
-            image_tag = soup.select_one('meta[property="og:image"]')
-            image = image_tag["content"] if image_tag and image_tag.has_attr("content") else None
+        article_tag = soup.select_one("article#dic_area")
+        article = article_tag.get_text(strip=True, separator="\n") if article_tag else ""
 
-            article_tag = soup.select_one("article#dic_area")
-            article = article_tag.get_text(strip=True, separator="\n") if article_tag else ""
-
-            print(f"✅ 추출 성공: 이미지 있음? {bool(image)}, 본문 길이: {len(article)}")
-            return image, article
-        except Exception as e:
-            print(f"❌ soup 내부 요소 파싱 실패: {type(e).__name__}: {e}")
-            return None, ""
+        log.info(f"✅ 추출 성공: 이미지 있음? {bool(image)}, 본문 길이: {len(article)}")
+        return image, article
 
     except Exception as e:
-        print(f"❌ 전체 fetch 실패 - {url}: {type(e).__name__}: {e}")
+        log.error(f"❌ fetch_article_details 실패 ({type(e).__name__}): {e}")
         return None, ""
 
 def get_or_create_last_time(filepath: str) -> str:
@@ -105,28 +96,23 @@ def get_or_create_last_time(filepath: str) -> str:
             with open(filepath, "r") as f:
                 last_time = f.read().strip()
             if last_time:
-                print(f"🧪 이전 기록된 시간: {last_time}")
+                log.info(f"🧪 이전 기록된 시간: {last_time}")
                 return last_time
-            else:
-                print(f"📁 파일은 있지만 내용 없음 → 현재 시각 기록")
-        else:
-            print(f"📁 파일 없음 → 생성 후 현재 시각 기록")
-
+        log.info("📁 기록이 없어 현재 시각으로 초기화")
         with open(filepath, "w") as f:
             f.write(now_str)
         return now_str
-
     except Exception as e:
-        print(f"❌ 시간 읽기/쓰기 실패 ({type(e).__name__}): {e}")
+        log.error(f"❌ 시간 읽기/쓰기 실패 ({type(e).__name__}): {e}")
         return now_str
 
 def save_latest_time(filepath: str, time_str: str):
     try:
         with open(filepath, "w") as f:
             f.write(time_str)
-        print(f"✅ 최신 시간 저장: {time_str}")
+        log.info(f"✅ 최신 시간 저장: {time_str}")
     except Exception as e:
-        print(f"❌ 시간 저장 실패 ({type(e).__name__}): {e}")
+        log.error(f"❌ 시간 저장 실패 ({type(e).__name__}): {e}")
 
 # ──────────────────────────────
 # 📌 뉴스 수집 메인 함수
@@ -138,7 +124,7 @@ def fetch_latest_news():
         res.raise_for_status()
         soup = BeautifulSoup(res.text, "lxml")
     except Exception as e:
-        print(f"❌ 뉴스 목록 요청 실패 ({type(e).__name__}): {e}")
+        log.error(f"❌ 뉴스 목록 요청 실패 ({type(e).__name__}): {e}")
         return []
 
     last_time = get_or_create_last_time(LAST_CRAWLED_FILE)
@@ -163,11 +149,10 @@ def fetch_latest_news():
                     "press": press,
                     "wdate": wdate
                 })
-
         except Exception as e:
-            print(f"❌ 개별 뉴스 파싱 실패 ({type(e).__name__}): {e}")
+            log.error(f"❌ 개별 뉴스 파싱 실패 ({type(e).__name__}): {e}")
 
-    print(f"🧪 새 뉴스 수: {len(new_articles)}")
+    log.info(f"🧪 새 뉴스 수: {len(new_articles)}")
 
     if new_articles:
         latest_time = max(parse_wdate(a["wdate"]) for a in new_articles)
@@ -175,19 +160,16 @@ def fetch_latest_news():
 
         for article in new_articles[:5]:
             try:
-                print(f"\n📰 기사 처리 중: {article['title']}")
+                log.info(f"\n📰 기사 처리 중: {article['title']}")
                 image, article_text = fetch_article_details(article["url"])
-
-                # 예외 방지용 안전 체크
                 preview = article_text[:300] if isinstance(article_text, str) else ""
-                print(f"[NEW] {article['wdate']} - {article['title']} ({article['press']})")
-                print(f"{preview}...\n")
-
+                log.info(f"[NEW] {article['wdate']} - {article['title']} ({article['press']})")
+                log.info(f"{preview}...\n")
                 time.sleep(1)
             except Exception as e:
-                print(f"❌ 본문 파싱 실패 ({type(e).__name__}): {e}")
+                log.error(f"❌ 본문 파싱 실패 ({type(e).__name__}): {e}")
     else:
-        print("⏰ 새 뉴스 없음")
+        log.info("⏰ 새 뉴스 없음")
 
     return new_articles
 
