@@ -161,6 +161,18 @@ def save_latest_time(filepath: str, time_str: str):
     except Exception as e:
         log.error(f"시간 저장 실패 ({type(e).__name__}): {e}")
 
+
+# 중복 방지용 세트
+generated_ids = set()
+
+def generate_news_id(date_str):
+    while True:
+        rand_part = f"{random.randint(0, 99999999):08d}"  # 0000 ~ 9999
+        news_id = f"{date_str}_{rand_part}"
+        if news_id not in generated_ids:
+            generated_ids.add(news_id)
+            return news_id
+
 # ──────────────────────────────
 # 📌 뉴스 수집 메인 함수
 # ──────────────────────────────
@@ -191,15 +203,17 @@ def fetch_latest_news():
 
             if article_time_dt > last_time_dt:
                 new_articles.append({
+                    "wdate": wdate,
                     "title": title,
-                    "url": url,
                     "press": press,
-                    "wdate": wdate
+                    "url": url,
                 })
         except Exception as e:
             log.error(f"개별 뉴스 파싱 실패 ({type(e).__name__}): {e}")
 
     log.info(f"새 뉴스 수: {len(new_articles)}")
+
+    new_articles_crawled = []
 
     if new_articles:
         latest_time = max(parse_wdate(a["wdate"]) for a in new_articles)
@@ -209,6 +223,27 @@ def fetch_latest_news():
             try:
                 log.info(f"\n기사 처리 중: {article['title']}")
                 image, article_text = fetch_article_details(article["url"])
+
+                wdate = article['wdate']
+                title = article['title']
+                press = article['press']
+                url = article['url']
+
+                article_time_dt = parse_wdate(wdate)
+                date_str = article_time_dt.strftime("%Y%m%d")
+
+                news_id = generate_news_id(date_str)
+
+                new_articles_crawled.append({
+                    "news_id": news_id,
+                    "wdate": wdate,
+                    "title": title,
+                    "article": article_text,
+                    "press": press,
+                    "url": url,
+                    "image": image,
+                })
+
                 preview = article_text[:300] if isinstance(article_text, str) else ""
                 log.info(f"[NEW] {article['wdate']} - {article['title']} ({article['press']})")
                 log.info(f"{preview}...\n")
@@ -217,7 +252,10 @@ def fetch_latest_news():
     else:
         log.info("새 뉴스 없음")
 
-    return new_articles
+    if new_articles_crawled:
+        pass
+
+    return new_articles_crawled
 
 if __name__ == "__main__":
     log.info("로그 테스트: news_pipeline.py 직접 실행됨")

@@ -7,7 +7,17 @@ log = logging.getLogger("news_logger")
 
 def job():
     log.info("🕒 [스케줄러] 뉴스 수집 실행")
-    fetch_latest_news()
+
+    # 1 뉴스 실시간 수집 실행 함수
+    news_crawled = fetch_latest_news()
+
+    # 2 뉴스 본문 전처리 실행 함수
+
+    # 3 뉴스 본문 요악 함수
+
+    # 4 
+
+    # 5 
 
 if __name__ == "__main__":
     log.info("✅ run_scheduler.py 시작됨")

@@ -70,12 +70,24 @@ services:
   #     - ./airflow/requirements.txt:/requirements.txt
   #     - ./airflow/entrypoint.sh:/entrypoint.sh
 
-  redis:
-    image: redis:7.2
-    container_name: redis-server
-    ports:
-      - "6379:6379"
-    restart: on-failure
+  automation:
+    build:
+      context: ./automation
+      dockerfile: Dockerfile
+    container_name: news-automation
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
+    volumes:
+      - ./automation/logs:/app/logs
+
+  # redis:
+  #   image: redis:7.2
+  #   container_name: redis-server
+  #   ports:
+  #     - "6379:6379"
+  #   restart: on-failure
   db:
     image: ankane/pgvector
     container_name: postgres-db
