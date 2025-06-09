@@ -3,5 +3,6 @@ beautifulsoup4
 lxml
 schedule
 sqlalchemy
+psycopg2-binary
 # transformers
 # torch

@@ -70,17 +70,18 @@ services:
   #     - ./airflow/requirements.txt:/requirements.txt
   #     - ./airflow/entrypoint.sh:/entrypoint.sh
 
-  # automation:
-  #   build:
-  #     context: ./automation
-  #     dockerfile: Dockerfile
-  #   container_name: news-automation
-  #   depends_on:
-  #     - db
-  #   environment:
-  #     - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
-  #   volumes:
-  #     - ./automation/logs:/app/logs
+  automation:
+    build:
+      context: ./automation
+      dockerfile: Dockerfile
+    container_name: news-automation
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
+    volumes:
+      - ./automation/logs:/app/automation/logs
+      - ./automoation:/automation
 
   # redis:
   #   image: redis:7.2

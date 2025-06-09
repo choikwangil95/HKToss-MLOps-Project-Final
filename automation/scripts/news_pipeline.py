@@ -5,6 +5,8 @@ from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 from requests.adapters import HTTPAdapter, Retry
 from logging.handlers import RotatingFileHandler
+import psycopg2
+from psycopg2.extras import execute_batch
 
 # ──────────────────────────────
 # 📌 로그 설정
@@ -103,19 +105,19 @@ def get_retry_session():
 def fetch_article_details(url):
     try:
         headers = get_random_headers()
-        log.info(f"📰 요청 URL: {url}")
+        # log.info(f"📰 요청 URL: {url}")
 
         session = get_retry_session()
         res = session.get(url, headers=headers, timeout=10)
-        log.info(f"📅 응답 상태 코드: {res.status_code}")
+        # log.info(f"📅 응답 상태 코드: {res.status_code}")
         res.raise_for_status()
-        log.info(f"📄 응답 본문 길이: {len(res.text)}")
+        # log.info(f"📄 응답 본문 길이: {len(res.text)}")
 
         soup = safe_soup_parse(res.text)
         if soup is None:
             return None, ""
 
-        log.info("soup 생성 완료")
+        # log.info("soup 생성 완료")
 
         image_tag = soup.select_one('meta[property="og:image"]')
         image = image_tag["content"] if image_tag and image_tag.has_attr("content") else None
@@ -123,7 +125,7 @@ def fetch_article_details(url):
         article_tag = soup.select_one("article#dic_area")
         article = article_tag.get_text(strip=True, separator="\n") if article_tag else ""
 
-        log.info(f"추출 성공: 이미지 있음? {bool(image)}, 본문 길이: {len(article)}")
+        # log.info(f"추출 성공: 이미지 있음? {bool(image)}, 본문 길이: {len(article)}")
 
         # 요청 사이에 무작위 대기
         time.sleep(random.uniform(1.0, 2.5))
@@ -172,6 +174,50 @@ def generate_news_id(date_str):
         if news_id not in generated_ids:
             generated_ids.add(news_id)
             return news_id
+        
+
+def save_to_db(articles):
+    if not articles:
+        log.info("저장할 뉴스 없음")
+        return
+
+    try:
+        DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db")
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor()
+
+        insert_query = """
+        INSERT INTO news_v2 (news_id, wdate, title, article, press, url, image)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (news_id) DO NOTHING;
+        """
+
+        values = [
+            (
+                article["news_id"],
+                parse_wdate(article["wdate"]),
+                article["title"],
+                article["article"],
+                article["press"],
+                article["url"],
+                article["image"]
+            )
+            for article in articles
+        ]
+
+        execute_batch(cur, insert_query, values)
+        conn.commit()
+
+        log.info(f"🧾 DB 저장 완료: {len(values)}건 저장")
+
+    except Exception as e:
+        log.error(f"❌ DB 저장 중 오류 ({type(e).__name__}): {e}")
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 # ──────────────────────────────
 # 📌 뉴스 수집 메인 함수
@@ -219,9 +265,9 @@ def fetch_latest_news():
         latest_time = max(parse_wdate(a["wdate"]) for a in new_articles)
         save_latest_time(LAST_CRAWLED_FILE, latest_time.strftime("%Y-%m-%d %H:%M"))
 
-        for article in new_articles[:5]:
+        for article in new_articles:
             try:
-                log.info(f"\n기사 처리 중: {article['title']}")
+                # log.info(f"\n기사 처리 중: {article['title']}")
                 image, article_text = fetch_article_details(article["url"])
 
                 wdate = article['wdate']
@@ -253,7 +299,7 @@ def fetch_latest_news():
         log.info("새 뉴스 없음")
 
     if new_articles_crawled:
-        pass
+        save_to_db(new_articles_crawled)
 
     return new_articles_crawled
 
