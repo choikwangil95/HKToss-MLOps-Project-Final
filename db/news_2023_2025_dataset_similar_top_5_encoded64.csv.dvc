@@ -1,0 +1,5 @@
+outs:
+- md5: b60820f7d2ffc1f94af8fb1c39c7a79e
+  size: 35822487
+  hash: md5
+  path: news_2023_2025_dataset_similar_top_5_encoded64.csv
