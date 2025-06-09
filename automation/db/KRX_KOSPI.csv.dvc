@@ -1,0 +1,5 @@
+outs:
+- md5: 527f5febdfac3a77d7cf83b7229c58de
+  size: 53825
+  hash: md5
+  path: KRX_KOSPI.csv

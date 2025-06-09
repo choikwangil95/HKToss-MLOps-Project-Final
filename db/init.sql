@@ -48,6 +48,15 @@ BEGIN
 END $$;
 
 
+-- news_v2_metadata 테이블 생성 (news_id에 외래키 제약조건 추가)
+CREATE TABLE news_v2_metadata (
+  news_id VARCHAR PRIMARY KEY,
+  stock_list TEXT,
+  industry_list TEXT,
+  CONSTRAINT fk_news_id FOREIGN KEY (news_id) REFERENCES news_v2(news_id) ON DELETE CASCADE
+);
+
+
 -- reports 테이블 생성
 CREATE TABLE IF NOT EXISTS reports (
     report_id SERIAL PRIMARY KEY,

@@ -1,0 +1,5 @@
+outs:
+- md5: 198284c0f2f3e143e05e453b295b0bcf
+  size: 157136
+  hash: md5
+  path: kospi_description.csv

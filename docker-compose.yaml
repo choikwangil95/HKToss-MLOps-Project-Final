@@ -74,14 +74,13 @@ services:
     build:
       context: ./automation
       dockerfile: Dockerfile
-    container_name: news-automation
+    container_name: automation
     depends_on:
       - db
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
     volumes:
-      - ./automation/logs:/app/automation/logs
-      - ./automoation:/automation
+      - ./automation:/automation
 
   # redis:
   #   image: redis:7.2

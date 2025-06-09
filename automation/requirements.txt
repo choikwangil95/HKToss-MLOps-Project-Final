@@ -4,5 +4,6 @@ lxml
 schedule
 sqlalchemy
 psycopg2-binary
-# transformers
-# torch
+transformers
+torch
+kss

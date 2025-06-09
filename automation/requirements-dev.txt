@@ -1,0 +1,4 @@
+konlpy
+joblib
+numpy
+pandas

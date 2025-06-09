@@ -54,9 +54,7 @@ def get_news_list_v2(
     if end_datetime:
         query = query.filter(NewsModel_v2.wdate <= end_datetime)
 
-    news_list = (
-        query.order_by(desc(NewsModel_v2.news_id)).offset(skip).limit(limit).all()
-    )
+    news_list = query.order_by(desc(NewsModel_v2.wdate)).offset(skip).limit(limit).all()
 
     return news_list
 
@@ -79,27 +77,18 @@ def get_news_detail_v2(db: Session, news_id: str):
     return news
 
 
-def find_news_similar(
-    db: Session, news_id: str, top_n=5, min_gap_days=180, min_gap_between=90
-):
+def find_news_similar(db: Session, news_id: str, top_n=5, min_gap_days=180, min_gap_between=90):
     # DB에서 타겟 뉴스 데이터 가져오기
     target_news = db.query(NewsModel).filter(NewsModel.news_id == news_id).first()
     if target_news is None:
         return []
 
     target_news_date = target_news.date
-    target_news_embedding = target_news_embedding = np.array(
-        target_news.embedding
-    ).reshape(1, -1)
+    target_news_embedding = target_news_embedding = np.array(target_news.embedding).reshape(1, -1)
 
     # DB에서 유사 후보 뉴스 데이터 가져오기
     date_threshold = target_news_date - timedelta(days=min_gap_days)
-    candidate_news = (
-        db.query(NewsModel)
-        .filter(NewsModel.news_id != news_id)
-        .filter(NewsModel.date <= date_threshold)
-        .all()
-    )
+    candidate_news = db.query(NewsModel).filter(NewsModel.news_id != news_id).filter(NewsModel.date <= date_threshold).all()
 
     # 3. 임베딩 있는 후보만 정리
     candidates = []
