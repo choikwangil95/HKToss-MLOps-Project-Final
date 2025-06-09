@@ -1,4 +1,16 @@
-from news_pipeline import fetch_latest_news, remove_market_related_sentences, get_summarize_model, summarize_event_focused, get_ner_pipeline, get_stock_names, load_official_stock_list, filter_official_stocks_from_list, load_stock_to_industry_map, get_industry_list_from_stocks, save_to_db_metadata
+from news_pipeline import (
+    fetch_latest_news,
+    remove_market_related_sentences,
+    get_summarize_model,
+    summarize_event_focused,
+    get_ner_pipeline,
+    get_stock_names,
+    load_official_stock_list,
+    filter_official_stocks_from_list,
+    load_stock_to_industry_map,
+    get_industry_list_from_stocks,
+    save_to_db_metadata,
+)
 import schedule
 import time
 import logging
@@ -8,7 +20,17 @@ import joblib
 log = logging.getLogger("news_logger")
 
 
-def job(tokenizer_summarize, model_summarize, device, ner_pipe, official_stock_set, stock_to_industry, vectorizer, lda_model, stopwords):
+def job(
+    tokenizer_summarize,
+    model_summarize,
+    device,
+    ner_pipe,
+    official_stock_set,
+    stock_to_industry,
+    vectorizer,
+    lda_model,
+    stopwords,
+):
     log.info("🕒 [스케줄러] 뉴스 수집 실행")
 
     # ──────────────────────────────
@@ -46,7 +68,9 @@ def job(tokenizer_summarize, model_summarize, device, ner_pipe, official_stock_s
     if len(filtered_news) != 0:
         for news in filtered_news:
             news_article = news["article_preprocessed"]
-            news_article_summarized = summarize_event_focused(news_article, tokenizer_summarize, model_summarize, device)
+            news_article_summarized = summarize_event_focused(
+                news_article, tokenizer_summarize, model_summarize, device
+            )
 
             if len(news_article_summarized) < 70:
                 continue  # 본문 길이 짧으면 제외
@@ -65,7 +89,9 @@ def job(tokenizer_summarize, model_summarize, device, ner_pipe, official_stock_s
             stock_list = get_stock_names(ner_pipe, news_summary)
 
             # 🔽 여기서 필터링
-            stock_list = filter_official_stocks_from_list(stock_list, official_stock_set)
+            stock_list = filter_official_stocks_from_list(
+                stock_list, official_stock_set
+            )
 
             if len(stock_list) > 4 or len(stock_list) < 1:
                 continue  # 종목 없거나 너무 많으면 제외
@@ -129,10 +155,32 @@ if __name__ == "__main__":
     log.info("✅ run_scheduler.py 시작됨")
 
     # 첫 실행 즉시
-    job(tokenizer_summarize, model_summarize, device, ner_pipe, official_stock_set, stock_to_industry, vectorizer, lda_model, stopwords)
+    job(
+        tokenizer_summarize,
+        model_summarize,
+        device,
+        ner_pipe,
+        official_stock_set,
+        stock_to_industry,
+        vectorizer,
+        lda_model,
+        stopwords,
+    )
 
     # 이후 매 1분마다 실행
-    schedule.every(1).minutes.do(lambda: job(tokenizer_summarize, model_summarize, ner_pipe, device, official_stock_set, stock_to_industry, vectorizer, lda_model, stopwords))
+    schedule.every(1).minutes.do(
+        lambda: job(
+            tokenizer_summarize,
+            model_summarize,
+            ner_pipe,
+            device,
+            official_stock_set,
+            stock_to_industry,
+            vectorizer,
+            lda_model,
+            stopwords,
+        )
+    )
 
     while True:
         schedule.run_pending()

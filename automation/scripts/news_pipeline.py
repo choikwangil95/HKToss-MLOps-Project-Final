@@ -33,7 +33,9 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # 🔧 포맷터 설정
-formatter = logging.Formatter(fmt="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+formatter = logging.Formatter(
+    fmt="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+)
 
 # 🔧 파일 핸들러 설정
 log_path = os.path.join(LOG_DIR, "news.log")
@@ -114,7 +116,9 @@ def safe_soup_parse(text, timeout=3):
 
 def get_retry_session():
     session = requests.Session()
-    retries = Retry(total=3, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504])
+    retries = Retry(
+        total=3, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504]
+    )
     session.mount("https://", HTTPAdapter(max_retries=retries))
     return session
 
@@ -137,10 +141,16 @@ def fetch_article_details(url):
         # log.info("soup 생성 완료")
 
         image_tag = soup.select_one('meta[property="og:image"]')
-        image = image_tag["content"] if image_tag and image_tag.has_attr("content") else None
+        image = (
+            image_tag["content"]
+            if image_tag and image_tag.has_attr("content")
+            else None
+        )
 
         article_tag = soup.select_one("article#dic_area")
-        article = article_tag.get_text(strip=True, separator="\n") if article_tag else ""
+        article = (
+            article_tag.get_text(strip=True, separator="\n") if article_tag else ""
+        )
 
         # log.info(f"추출 성공: 이미지 있음? {bool(image)}, 본문 길이: {len(article)}")
 
@@ -202,7 +212,9 @@ def save_to_db(articles):
         return
 
     try:
-        DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db")
+        DB_URL = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db"
+        )
         conn = psycopg2.connect(DB_URL)
         cur = conn.cursor()
 
@@ -246,7 +258,9 @@ def save_to_db_metadata(articles):
         return
 
     try:
-        DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db")
+        DB_URL = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db"
+        )
         conn = psycopg2.connect(DB_URL)
         cur = conn.cursor()
 
@@ -359,7 +373,9 @@ def fetch_latest_news():
                 )
 
                 preview = article_text[:300] if isinstance(article_text, str) else ""
-                log.info(f"[NEW] {article['wdate']} - {article['title']} ({article['press']})")
+                log.info(
+                    f"[NEW] {article['wdate']} - {article['title']} ({article['press']})"
+                )
                 log.info(f"{preview}...\n")
             except Exception as e:
                 log.error(f"본문 파싱 실패 ({type(e).__name__}): {e}")
@@ -417,7 +433,9 @@ def remove_market_related_sentences(text: str) -> str:
     return text_preprocessed
 
 
-def get_summarize_model(model_name="digit82/kobart-summarization", model_dir="./models/kobart_summary"):
+def get_summarize_model(
+    model_name="digit82/kobart-summarization", model_dir="./models/kobart_summary"
+):
     # 모델 이름 & 로컬 저장 경로
     model_name = "digit82/kobart-summarization"
     model_dir = "./models/kobart_summary"
@@ -433,7 +451,9 @@ def get_summarize_model(model_name="digit82/kobart-summarization", model_dir="./
     else:
         print("🌐 모델 다운로드 중...")
         tokenizer_summarize = AutoTokenizer.from_pretrained(model_name)
-        model_summarize = AutoModelForSeq2SeqLM.from_pretrained(model_name, use_safetensors=True)
+        model_summarize = AutoModelForSeq2SeqLM.from_pretrained(
+            model_name, use_safetensors=True
+        )
 
         print("💾 모델 로컬 저장...")
         tokenizer_summarize.save_pretrained(model_dir)
@@ -447,7 +467,9 @@ def get_summarize_model(model_name="digit82/kobart-summarization", model_dir="./
 
 def summarize_event_focused(text, tokenizer_summarize, model_summarize, device):
     # 토크나이징 및 텐서 변환 (GPU로 올리기)
-    inputs = tokenizer_summarize(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
+    inputs = tokenizer_summarize(
+        text, return_tensors="pt", truncation=True, padding=True, max_length=512
+    )
     input_ids = inputs["input_ids"].to(device)
 
     text_length = len(text)
@@ -475,7 +497,9 @@ def summarize_event_focused(text, tokenizer_summarize, model_summarize, device):
         do_sample=False,  # 일관된 요약
     )
 
-    article_summarized = tokenizer_summarize.decode(summary_ids[0], skip_special_tokens=True)
+    article_summarized = tokenizer_summarize.decode(
+        summary_ids[0], skip_special_tokens=True
+    )
 
     return article_summarized
 
@@ -488,7 +512,9 @@ def get_ner_pipeline(model_name="KPF/KPF-BERT-NER", local_dir="models/ner"):
     if not os.path.exists(local_dir):
         print("🔽 NER 모델 로컬에 없음. 다운로드 중...")
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForTokenClassification.from_pretrained(model_name, use_safetensors=True)
+        model = AutoModelForTokenClassification.from_pretrained(
+            model_name, use_safetensors=True
+        )
 
         # 저장
         tokenizer.save_pretrained(local_dir)
@@ -564,7 +590,11 @@ def load_stock_to_industry_map(kospi_desc_csv_path):
 
 # 종목 리스트를 업종 리스트로 변환
 def get_industry_list_from_stocks(stock_list, stock_to_industry):
-    return [stock_to_industry.get(stock, "") for stock in stock_list if stock_to_industry.get(stock, "") != ""]
+    return [
+        stock_to_industry.get(stock, "")
+        for stock in stock_list
+        if stock_to_industry.get(stock, "") != ""
+    ]
 
 
 def predict_topic_for_df(df, vectorizer, lda_model, stopwords, n_topics=9):
