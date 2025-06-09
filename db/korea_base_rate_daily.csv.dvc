@@ -1,0 +1,5 @@
+outs:
+- md5: 34610b6327b6b841e2d47de60ab0cea1
+  size: 97903
+  hash: md5
+  path: korea_base_rate_daily.csv
