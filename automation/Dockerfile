@@ -6,8 +6,9 @@ WORKDIR /automation
 # 2. 의존성만 먼저 복사
 COPY requirements.txt .
 
+# 3. 패키지 설치 (속도 개선)
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt 
+    pip install --prefer-binary -r requirements.txt
 
 # 4. 전체 코드 복사
 COPY . .

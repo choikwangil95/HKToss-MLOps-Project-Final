@@ -7,12 +7,14 @@ from schemas.news import (
     News_v2,
     NewsOut,
     NewsOut_v2,
+    NewsOut_v2_Metadata,
     SimilarNews,
     Report,
     NewsStock,
     PastReportsResponse,
 )
 from services.news import (
+    get_news_detail_v2_metadata,
     get_news_list,
     get_news_list_v2,
     get_news_detail,
@@ -152,6 +154,22 @@ def news_detail(
     특정 뉴스의 상세 정보를 조회합니다.
     """
     return get_news_detail_v2(db, news_id)
+
+
+@router.get(
+    "/v2/{news_id}/metadata",
+    response_model=NewsOut_v2_Metadata,
+    summary="[완료] 뉴스 상세 메타데이터 조회 (production)",
+    description="뉴스 ID를 기반으로 해당 뉴스 기사의 메타데이터 정보를 조회합니다.",
+)
+def news_detail_metadata(
+    news_id: str = Path(..., description="뉴스 고유 ID"),
+    db: Session = Depends(get_db),
+):
+    """
+    특정 뉴스의 상세 정보를 조회합니다.
+    """
+    return get_news_detail_v2_metadata(db, news_id)
 
 
 @router.get(

@@ -1,0 +1,5 @@
+outs:
+- md5: a804e10a589722023163e3f8691bc128
+  size: 5195098
+  hash: md5
+  path: news_2023_2025_metadata.csv

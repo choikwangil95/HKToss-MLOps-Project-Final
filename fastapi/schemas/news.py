@@ -66,6 +66,13 @@ class NewsOut_v2(BaseModel):
     image: str
 
 
+class NewsOut_v2_Metadata(BaseModel):
+    news_id: str
+    summary: str
+    stock_list: List[str]
+    industry_list: List[str]
+
+
 #############################
 
 

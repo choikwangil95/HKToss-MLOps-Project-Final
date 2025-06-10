@@ -11,6 +11,6 @@ numpy
 pandas
 chardet
 scikit-learn
-optimum
 onnxruntime
 onnx
+tokenizers

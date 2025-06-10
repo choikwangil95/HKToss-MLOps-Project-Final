@@ -24,8 +24,9 @@ log = logging.getLogger("news_logger")
 
 
 def job(
+    encoder_sess_summarize,
+    decoder_sess_summarize,
     tokenizer_summarize,
-    model_summarize,
     tokenizer_ner,
     session_ner,
     official_stock_set,
@@ -72,7 +73,10 @@ def job(
         for news in filtered_news:
             news_article = news["article_preprocessed"]
             news_article_summarized = summarize_event_focused(
-                news_article, tokenizer_summarize, model_summarize
+                news_article,
+                encoder_sess_summarize,
+                decoder_sess_summarize,
+                tokenizer_summarize,
             )
 
             if len(news_article_summarized) < 70:
@@ -114,7 +118,7 @@ def job(
 
     print(f"\n종목, 업종명 매칭 뉴스 {ner_news}\n")
 
-    # save_to_db_metadata(ner_news)
+    save_to_db_metadata(ner_news)
 
 
 # ──────────────────────────────
@@ -134,7 +138,9 @@ def job(
 
 if __name__ == "__main__":
     log.info("🟡 summarize 모델 불러오는 중...")
-    model_summarize, tokenizer_summarize = get_summarize_model()
+    encoder_sess_summarize, decoder_sess_summarize, tokenizer_summarize = (
+        get_summarize_model()
+    )
     log.info("🟢 summarize 모델 로딩 완료")
 
     log.info("🟡 NER 모델 불러오는 중...")
@@ -144,32 +150,38 @@ if __name__ == "__main__":
     # 현재 스크립트 기준 디렉토리 (automation/scripts/)
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    # 상위 폴더의 db 경로들
+    log.info("🟡 KOSPI 데이터 불러오는 중...")
     official_stock_path = os.path.abspath(
         os.path.join(BASE_DIR, "../db/KRX_KOSPI_STOCK.csv")
     )
     industry_map_path = os.path.abspath(
         os.path.join(BASE_DIR, "../db/KRX_KOSPI_DESCRIPTION.csv")
     )
+
+    official_stock_set = load_official_stock_list(official_stock_path)
+    stock_to_industry = load_stock_to_industry_map(industry_map_path)
+    log.info("🟢 KOSPI 데이터 로딩 완료")
+
+    log.info("🟡 LDA 모델 불러오는 중...")
     lda_model_path = os.path.abspath(os.path.join(BASE_DIR, "../db/best_lda_model.pkl"))
     count_vectorizer_path = os.path.abspath(
         os.path.join(BASE_DIR, "../db/count_vectorizer.pkl")
     )
     stopwords_path = os.path.abspath(os.path.join(BASE_DIR, "../db/stopwords-ko.txt"))
 
-    official_stock_set = load_official_stock_list(official_stock_path)
-    stock_to_industry = load_stock_to_industry_map(industry_map_path)
     vectorizer = joblib.load(count_vectorizer_path)
     lda_model = joblib.load(lda_model_path)
     with open(stopwords_path, "r", encoding="utf-8") as f:
         stopwords = [word.strip() for word in f.readlines()]
+    log.info("🟢 LDA 모델 로딩 완료")
 
     log.info("✅ run_scheduler.py 시작됨")
 
     # 첫 실행 즉시
     job(
+        encoder_sess_summarize,
+        decoder_sess_summarize,
         tokenizer_summarize,
-        model_summarize,
         tokenizer_ner,
         session_ner,
         official_stock_set,
@@ -182,8 +194,9 @@ if __name__ == "__main__":
     # 이후 매 1분마다 실행
     schedule.every(1).minutes.do(
         lambda: job(
+            encoder_sess_summarize,
+            decoder_sess_summarize,
             tokenizer_summarize,
-            model_summarize,
             tokenizer_ner,
             session_ner,
             official_stock_set,

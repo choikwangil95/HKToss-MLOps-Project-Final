@@ -42,7 +42,7 @@ DO $$
 BEGIN
     IF (SELECT COUNT(*) FROM news_v2) = 0 THEN
         COPY news_v2(news_id, wdate, title, article, press, url, image)
-        FROM '/docker-entrypoint-initdb.d/news_2023_2025.csv'
+        FROM '/docker-entrypoint-initdb.d/news_2023_2025_raw.csv'
         WITH (FORMAT csv, HEADER true);
     END IF;
 END $$;
@@ -51,11 +51,20 @@ END $$;
 -- news_v2_metadata 테이블 생성 (news_id에 외래키 제약조건 추가)
 CREATE TABLE news_v2_metadata (
   news_id VARCHAR PRIMARY KEY,
+  summary TEXT,
   stock_list TEXT,
   industry_list TEXT,
   CONSTRAINT fk_news_id FOREIGN KEY (news_id) REFERENCES news_v2(news_id) ON DELETE CASCADE
 );
 
+DO $$
+BEGIN
+    IF (SELECT COUNT(*) FROM news_v2_metadata) = 0 THEN
+        COPY news_v2_metadata(news_id, summary, stock_list, industry_list)
+        FROM '/docker-entrypoint-initdb.d/news_2023_2025_metadata.csv'
+        WITH (FORMAT csv, HEADER true);
+    END IF;
+END $$;
 
 -- reports 테이블 생성
 CREATE TABLE IF NOT EXISTS reports (

@@ -30,10 +30,19 @@ class NewsModel_v2(Base):
     article = Column(Text)  # content TEXT
     press = Column(Text)
     image = Column(Text)
-    # embedding = Column(Vector(768))  # embedding VECTOR(768)
-    # stocks = Column(
-    #     ARRAY(String)
-    # )  # stocks VARCHAR, 쉼표로 구분된 종목명들 (예: "삼성전자, SK하이닉스")
+
+
+class NewsModel_v2_Metadata(Base):
+    __tablename__ = "news_v2_metadata"
+
+    news_id = Column(String, primary_key=True)  # VARCHAR PRIMARY KEY
+    summary = Column(Text)  # summary TEXT
+    stock_list = Column(
+        ARRAY(String)
+    )  # stock_list VARCHAR, 쉼표로 구분된 종목명들 (예: "삼성전자, SK하이닉스")
+    industry_list = Column(
+        ARRAY(String)
+    )  # industry_list VARCHAR, 쉼표로 구분된 업종명들 (예: "반도체, IT")
 
 
 class ReportModel(Base):

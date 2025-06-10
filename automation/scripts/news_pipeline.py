@@ -261,14 +261,15 @@ def save_to_db_metadata(articles):
         cur = conn.cursor()
 
         insert_query = """
-		INSERT INTO news_v2_metadata (news_id, stock_list, industry_list)
-		VALUES (%s, %s, %s)
+		INSERT INTO news_v2_metadata (news_id, summary, stock_list, industry_list)
+		VALUES (%s, %s, %s, %s)
 		ON CONFLICT (news_id) DO NOTHING;
 		"""
 
         values = [
             (
                 article["news_id"],
+                article["summary"],
                 article["stock_list"],
                 article["industry_list"],
             )
@@ -429,43 +430,60 @@ def remove_market_related_sentences(text: str) -> str:
     return text_preprocessed
 
 
-def summarize_event_focused(text, model_summarize, tokenizer_summarize):
-    # 토큰화
-    encoding = tokenizer_summarize(
-        text,
-        return_tensors="np",  # ONNX 모델 호환용
-        truncation=True,
-    )
+def summarize_event_focused(
+    text,
+    encoder_sess,
+    decoder_sess,
+    tokenizer,
+    max_length=128,
+    no_repeat_ngram_size=3,
+    repetition_penalty=1.2,
+):
+    input_ids = tokenizer.encode(text).ids
+    input_ids_np = np.array([input_ids], dtype=np.int64)
+    attention_mask = np.ones_like(input_ids_np, dtype=np.int64)
 
-    input_ids = encoding["input_ids"]
+    encoder_outputs = encoder_sess.run(
+        None, {"input_ids": input_ids_np, "attention_mask": attention_mask}
+    )[0]
 
-    text_length = len(text)
+    decoder_input_ids = [tokenizer.token_to_id("<s>")]
+    generated_ids = decoder_input_ids.copy()
 
-    # 1. 최소 길이는 짧은 본문은 고정, 긴 본문은 점진적으로 증가
-    def compute_min_length(text_length: int) -> int:
-        if text_length < 300:
-            return 30
-        else:
-            return 50
+    for _ in range(max_length):
+        decoder_input_np = np.array([generated_ids], dtype=np.int64)
+        decoder_inputs = {
+            "input_ids": decoder_input_np,
+            "encoder_hidden_states": encoder_outputs,
+            "encoder_attention_mask": attention_mask,
+        }
+        logits = decoder_sess.run(None, decoder_inputs)[0]
+        next_token_logits = logits[:, -1, :]
 
-    min_len = compute_min_length(text_length)
-    max_len = round(text_length * 0.5) + 50  # 더 여유를 주되 max 길이 제한
+        # repetition penalty 적용
+        for token_id in set(generated_ids):
+            next_token_logits[0, token_id] /= repetition_penalty
 
-    # 생성
-    summary_ids = model_summarize.generate(
-        input_ids,
-        min_length=min_len,  # 최소 요약 길이 (예: 30)
-        max_new_tokens=max_len,  # 추가 생성 최대 토큰 수
-        num_beams=4,  # 빔 서치 개수
-        length_penalty=1.0,  # 너무 긴 문장 방지
-        repetition_penalty=1.3,  # 반복 억제
-        no_repeat_ngram_size=3,  # 동일한 3-gram 반복 금지
-        early_stopping=True,  # <eos> 토큰 생성 시 중단
-        # do_sample은 사용하지 않음 (ONNX 미지원)
-    )
-    summary = tokenizer_summarize.decode(
-        summary_ids[0].tolist(), skip_special_tokens=True
-    )
+        # no_repeat_ngram_size 적용
+        if no_repeat_ngram_size > 0 and len(generated_ids) >= no_repeat_ngram_size:
+            ngram = tuple(generated_ids[-(no_repeat_ngram_size - 1) :])
+            banned = {
+                tuple(generated_ids[i : i + no_repeat_ngram_size])
+                for i in range(len(generated_ids) - no_repeat_ngram_size + 1)
+            }
+            for token_id in range(next_token_logits.shape[-1]):
+                if ngram + (token_id,) in banned:
+                    next_token_logits[0, token_id] = -1e9  # 큰 마이너스
+
+        # greedy 선택
+        next_token_id = int(np.argmax(next_token_logits, axis=-1)[0])
+
+        if next_token_id == tokenizer.token_to_id("</s>"):
+            break
+
+        generated_ids.append(next_token_id)
+
+    summary = tokenizer.decode(generated_ids, skip_special_tokens=True)
 
     return summary
 

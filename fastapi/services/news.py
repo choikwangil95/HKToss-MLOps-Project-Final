@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from models.news import NewsModel, NewsModel_v2, ReportModel
+from models.news import NewsModel, NewsModel_v2, NewsModel_v2_Metadata, ReportModel
 from schemas.news import News
 from datetime import timedelta
 from sklearn.metrics.pairwise import cosine_similarity
@@ -77,18 +77,42 @@ def get_news_detail_v2(db: Session, news_id: str):
     return news
 
 
-def find_news_similar(db: Session, news_id: str, top_n=5, min_gap_days=180, min_gap_between=90):
+def get_news_detail_v2_metadata(db: Session, news_id: str):
+    news = (
+        db.query(NewsModel_v2_Metadata)
+        .filter(NewsModel_v2_Metadata.news_id == news_id)
+        .first()
+    )
+
+    print(news)
+
+    if news is None:
+        return None
+
+    return news
+
+
+def find_news_similar(
+    db: Session, news_id: str, top_n=5, min_gap_days=180, min_gap_between=90
+):
     # DB에서 타겟 뉴스 데이터 가져오기
     target_news = db.query(NewsModel).filter(NewsModel.news_id == news_id).first()
     if target_news is None:
         return []
 
     target_news_date = target_news.date
-    target_news_embedding = target_news_embedding = np.array(target_news.embedding).reshape(1, -1)
+    target_news_embedding = target_news_embedding = np.array(
+        target_news.embedding
+    ).reshape(1, -1)
 
     # DB에서 유사 후보 뉴스 데이터 가져오기
     date_threshold = target_news_date - timedelta(days=min_gap_days)
-    candidate_news = db.query(NewsModel).filter(NewsModel.news_id != news_id).filter(NewsModel.date <= date_threshold).all()
+    candidate_news = (
+        db.query(NewsModel)
+        .filter(NewsModel.news_id != news_id)
+        .filter(NewsModel.date <= date_threshold)
+        .all()
+    )
 
     # 3. 임베딩 있는 후보만 정리
     candidates = []
