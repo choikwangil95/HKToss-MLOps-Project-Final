@@ -84,12 +84,15 @@ def get_news_detail_v2_metadata(db: Session, news_id: str):
         .first()
     )
 
-    print(news)
-
     if news is None:
-        return None
+        raise HTTPException(status_code=404, detail="News not found")
 
-    return news
+    return {
+        "news_id": news.news_id,
+        "summary": news.summary,
+        "stock_list": news.stock_list,
+        "industry_list": news.industry_list,
+    }
 
 
 def find_news_similar(

@@ -10,6 +10,9 @@ from news_pipeline import (
     load_stock_to_industry_map,
     get_industry_list_from_stocks,
     save_to_db_metadata,
+    get_news_deduplicate_by_title,
+    save_to_db,
+    send_to_redis,
 )
 import schedule
 import time
@@ -44,6 +47,14 @@ def job(
 
     # 1 뉴스 실시간 수집 실행 함수
     news_crawled = fetch_latest_news()
+
+    if len(news_crawled) != 0:
+        # title 중복 제거
+        news_crawled = get_news_deduplicate_by_title(news_crawled)
+
+        save_to_db(news_crawled)
+
+        send_to_redis(news_crawled)
 
     # ──────────────────────────────
     # 2 뉴스 전처리
@@ -102,19 +113,22 @@ def job(
             stock_list = filter_official_stocks_from_list(
                 stock_list, official_stock_set
             )
+            news["stock_list"] = stock_list
 
+            # 종목 없거나 너무 많으면 제외
             if len(stock_list) > 4 or len(stock_list) < 1:
-                continue  # 종목 없거나 너무 많으면 제외
+                news["stock_list"] = None
 
             industry_list = get_industry_list_from_stocks(stock_list, stock_to_industry)
-
-            if len(industry_list) < 1:
-                continue
-
-            news["stock_list"] = stock_list
             news["industry_list"] = industry_list
 
+            if len(industry_list) < 1:
+                news["industry_list"] = None
+
             ner_news.append(news)
+
+            # 중복 뉴스 제거
+            ner_news = get_news_deduplicate_by_title(ner_news)
 
     print(f"\n종목, 업종명 매칭 뉴스 {ner_news}\n")
 

@@ -14,6 +14,8 @@ import pandas as pd
 import re
 from konlpy.tag import Okt
 import numpy as np
+import json
+import redis
 
 # ──────────────────────────────
 # 📌 로그 설정
@@ -266,12 +268,22 @@ def save_to_db_metadata(articles):
 		ON CONFLICT (news_id) DO NOTHING;
 		"""
 
+        print(f"==================={articles}===================")
+
         values = [
             (
                 article["news_id"],
                 article["summary"],
-                article["stock_list"],
-                article["industry_list"],
+                (
+                    json.dumps(article["stock_list"])
+                    if article["stock_list"] is not None
+                    else None
+                ),
+                (
+                    json.dumps(article["industry_list"])
+                    if article["industry_list"] is not None
+                    else None
+                ),
             )
             for article in articles
         ]
@@ -378,9 +390,6 @@ def fetch_latest_news():
                 log.error(f"본문 파싱 실패 ({type(e).__name__}): {e}")
     else:
         log.info("새 뉴스 없음")
-
-    if new_articles_crawled:
-        save_to_db(new_articles_crawled)
 
     return new_articles_crawled
 
@@ -545,7 +554,7 @@ def extract_ogg_economy(tokens, labels, target_label="OGG_ECONOMY"):
 # 종목명 집합 불러오기
 def load_official_stock_list(krx_csv_path):
     df = pd.read_csv(krx_csv_path, encoding="cp949")
-    return set(df["종목명"].dropna().unique())
+    return list(set(df["종목명"].dropna().unique()))
 
 
 # 종목 리스트에서 공식 종목만 필터링
@@ -561,11 +570,27 @@ def load_stock_to_industry_map(kospi_desc_csv_path):
 
 # 종목 리스트를 업종 리스트로 변환
 def get_industry_list_from_stocks(stock_list, stock_to_industry):
+    if len(stock_list) > 4 or len(stock_list) < 1:
+        return []
+
     return [
         stock_to_industry.get(stock, "")
         for stock in stock_list
         if stock_to_industry.get(stock, "") != ""
     ]
+
+
+def get_news_deduplicate_by_title(news_list):
+    seen_titles = set()
+    deduped_news = []
+
+    for news in news_list:
+        title = news.get("title")
+        if title not in seen_titles:
+            seen_titles.add(title)
+            deduped_news.append(news)
+
+    return deduped_news
 
 
 def predict_topic_for_df(df, vectorizer, lda_model, stopwords, n_topics=9):
@@ -604,6 +629,38 @@ def predict_topic_for_df(df, vectorizer, lda_model, stopwords, n_topics=9):
     result_df = pd.merge(df, topic_df, on="news_id", how="left")
 
     return result_df
+
+
+def send_to_redis(news_data):
+    try:
+        r = redis.Redis(
+            host="43.200.17.139",
+            port=6379,
+            password="q1w2e3r4!@#",
+            decode_responses=True,  # bytes 대신 str 로 받기
+        )
+        if not r.ping():
+            log.error("Redis 서버에 연결할 수 없습니다.")
+            return
+
+        # Redis에 저장
+        for news in news_data:
+            channel = "news_channel"
+            data = {
+                "news_id": news["news_id"],
+                "wdate": news["wdate"],
+                "title": news["title"],
+                "article": news["article"],
+                "press": news["press"],
+                "url": news["url"],
+                "image": news["image"],
+            }
+            message = json.dumps(data, ensure_ascii=False)
+            r.publish(channel, message)
+
+        log.info(f"Redis에 {len(news_data)}건 뉴스 푸시 완료")
+    except Exception as e:
+        log.error(f"Redis 푸시 실패 ({type(e).__name__}): {e}")
 
 
 if __name__ == "__main__":

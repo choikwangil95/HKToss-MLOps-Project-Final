@@ -52,8 +52,8 @@ END $$;
 CREATE TABLE news_v2_metadata (
   news_id VARCHAR PRIMARY KEY,
   summary TEXT,
-  stock_list TEXT,
-  industry_list TEXT,
+  stock_list JSON,
+  industry_list JSON,
   CONSTRAINT fk_news_id FOREIGN KEY (news_id) REFERENCES news_v2(news_id) ON DELETE CASCADE
 );
 

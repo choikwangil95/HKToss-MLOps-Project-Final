@@ -1,7 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from datetime import datetime, date
 from typing import List, Union
+from pydantic import validator
+import ast
 
 
 class News(BaseModel):
@@ -65,12 +67,30 @@ class NewsOut_v2(BaseModel):
     press: str
     image: str
 
+    class Config:
+        orm_mode = True
+
 
 class NewsOut_v2_Metadata(BaseModel):
     news_id: str
     summary: str
-    stock_list: List[str]
-    industry_list: List[str]
+    stock_list: Optional[List[str]] = []  # None이면 빈 리스트
+    industry_list: Optional[List[str]] = []  # None이면 빈 리스트
+
+    class Config:
+        orm_mode = True
+
+    @field_validator("stock_list", "industry_list", mode="before")
+    @classmethod
+    def parse_list(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            try:
+                return ast.literal_eval(v)
+            except Exception:
+                return [v]
+        return v
 
 
 #############################
