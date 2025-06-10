@@ -5,12 +5,9 @@ WORKDIR /automation
 
 # 2. 의존성만 먼저 복사
 COPY requirements.txt .
-COPY requirements-dev.txt .
 
-# 3. 패키지 설치 (캐시 최적화)
-RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir -r requirements-dev.txt
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt 
 
 # 4. 전체 코드 복사
 COPY . .

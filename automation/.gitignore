@@ -1,5 +1,5 @@
 /logs
 /data
-/models
+# /models
 /db/best_lda_model.pkl
 /db/count_vectorizer.pkl

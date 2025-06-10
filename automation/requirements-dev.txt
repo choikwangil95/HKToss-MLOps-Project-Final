@@ -1,5 +1,0 @@
-konlpy
-joblib
-numpy
-pandas
-chardet

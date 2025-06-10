@@ -1,10 +1,10 @@
+from load_models import get_ner_tokenizer, get_summarize_model
 from news_pipeline import (
     fetch_latest_news,
     remove_market_related_sentences,
-    get_summarize_model,
     summarize_event_focused,
-    get_ner_pipeline,
-    get_stock_names,
+    get_ner_tokens,
+    extract_ogg_economy,
     load_official_stock_list,
     filter_official_stocks_from_list,
     load_stock_to_industry_map,
@@ -16,6 +16,9 @@ import time
 import logging
 import os
 import joblib
+from pathlib import Path
+from label_map import id2label
+
 
 log = logging.getLogger("news_logger")
 
@@ -23,8 +26,8 @@ log = logging.getLogger("news_logger")
 def job(
     tokenizer_summarize,
     model_summarize,
-    device,
-    ner_pipe,
+    tokenizer_ner,
+    session_ner,
     official_stock_set,
     stock_to_industry,
     vectorizer,
@@ -60,7 +63,7 @@ def job(
             news["article_preprocessed"] = news_article_preprocessed
             filtered_news.append(news)
 
-    print(f"\n필터린됭 뉴스 {filtered_news}\n")
+    print(f"\n필터링된 뉴스 {filtered_news}\n")
 
     # 2 뉴스 본문 요악 함수
     summarzied_news = []
@@ -69,7 +72,7 @@ def job(
         for news in filtered_news:
             news_article = news["article_preprocessed"]
             news_article_summarized = summarize_event_focused(
-                news_article, tokenizer_summarize, model_summarize, device
+                news_article, tokenizer_summarize, model_summarize
             )
 
             if len(news_article_summarized) < 70:
@@ -78,7 +81,7 @@ def job(
             news["summary"] = news_article_summarized
             summarzied_news.append(news)
 
-    print(f"\n요약 뉴스 확인 {summarzied_news}\n")
+    print(f"\n요약된 뉴스  {summarzied_news}\n")
 
     ner_news = []
 
@@ -86,9 +89,12 @@ def job(
     if len(summarzied_news) != 0:
         for news in summarzied_news:
             news_summary = news["summary"]
-            stock_list = get_stock_names(ner_pipe, news_summary)
+            tokens, labels = get_ner_tokens(
+                tokenizer_ner, session_ner, news_summary, id2label
+            )
+            stock_list = extract_ogg_economy(tokens, labels)
 
-            # 🔽 여기서 필터링
+            # 여기서 필터링
             stock_list = filter_official_stocks_from_list(
                 stock_list, official_stock_set
             )
@@ -106,9 +112,9 @@ def job(
 
             ner_news.append(news)
 
-    print(f"\n종목, 업종명 매칭 뉴스 확인 {ner_news}\n")
+    print(f"\n종목, 업종명 매칭 뉴스 {ner_news}\n")
 
-    save_to_db_metadata(ner_news)
+    # save_to_db_metadata(ner_news)
 
 
 # ──────────────────────────────
@@ -128,25 +134,31 @@ def job(
 
 if __name__ == "__main__":
     log.info("🟡 summarize 모델 불러오는 중...")
-    tokenizer_summarize, model_summarize, device = get_summarize_model()
+    model_summarize, tokenizer_summarize = get_summarize_model()
     log.info("🟢 summarize 모델 로딩 완료")
 
     log.info("🟡 NER 모델 불러오는 중...")
-    ner_pipe = get_ner_pipeline()
+    tokenizer_ner, session_ner = get_ner_tokenizer()
     log.info("🟢 NER 모델 로딩 완료")
 
+    # 현재 스크립트 기준 디렉토리 (automation/scripts/)
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    official_stock_path = os.path.join(BASE_DIR, "../db/KRX_KOSPI.csv")
-    industry_map_path = os.path.join(BASE_DIR, "../db/kospi_description.csv")
+    # 상위 폴더의 db 경로들
+    official_stock_path = os.path.abspath(
+        os.path.join(BASE_DIR, "../db/KRX_KOSPI_STOCK.csv")
+    )
+    industry_map_path = os.path.abspath(
+        os.path.join(BASE_DIR, "../db/KRX_KOSPI_DESCRIPTION.csv")
+    )
+    lda_model_path = os.path.abspath(os.path.join(BASE_DIR, "../db/best_lda_model.pkl"))
+    count_vectorizer_path = os.path.abspath(
+        os.path.join(BASE_DIR, "../db/count_vectorizer.pkl")
+    )
+    stopwords_path = os.path.abspath(os.path.join(BASE_DIR, "../db/stopwords-ko.txt"))
 
     official_stock_set = load_official_stock_list(official_stock_path)
     stock_to_industry = load_stock_to_industry_map(industry_map_path)
-
-    lda_model_path = os.path.join(BASE_DIR, "../db/best_lda_model.pkl")
-    count_vectorizer_path = os.path.join(BASE_DIR, "../db/count_vectorizer.pkl")
-    stopwords_path = os.path.join(BASE_DIR, "../db/stopwords-ko.txt")
-
     vectorizer = joblib.load(count_vectorizer_path)
     lda_model = joblib.load(lda_model_path)
     with open(stopwords_path, "r", encoding="utf-8") as f:
@@ -158,8 +170,8 @@ if __name__ == "__main__":
     job(
         tokenizer_summarize,
         model_summarize,
-        device,
-        ner_pipe,
+        tokenizer_ner,
+        session_ner,
         official_stock_set,
         stock_to_industry,
         vectorizer,
@@ -172,8 +184,8 @@ if __name__ == "__main__":
         lambda: job(
             tokenizer_summarize,
             model_summarize,
-            ner_pipe,
-            device,
+            tokenizer_ner,
+            session_ner,
             official_stock_set,
             stock_to_industry,
             vectorizer,

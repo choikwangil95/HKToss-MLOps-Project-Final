@@ -4,6 +4,13 @@ lxml
 schedule
 sqlalchemy
 psycopg2-binary
-transformers
-torch
 kss
+konlpy
+joblib
+numpy
+pandas
+chardet
+scikit-learn
+optimum
+onnxruntime
+onnx

@@ -10,10 +10,6 @@ from psycopg2.extras import execute_batch
 import re
 from kss import split_sentences
 import os
-import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
-from label_map import label2id, id2label
 import pandas as pd
 import re
 from konlpy.tag import Okt
@@ -433,44 +429,15 @@ def remove_market_related_sentences(text: str) -> str:
     return text_preprocessed
 
 
-def get_summarize_model(
-    model_name="digit82/kobart-summarization", model_dir="./models/kobart_summary"
-):
-    # 모델 이름 & 로컬 저장 경로
-    model_name = "digit82/kobart-summarization"
-    model_dir = "./models/kobart_summary"
-
-    # GPU 설정
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # 로컬에 저장된 모델이 있으면 불러오고, 없으면 다운로드 후 저장
-    if os.path.exists(model_dir):
-        print("📦 로컬 모델 로드 중...")
-        tokenizer_summarize = AutoTokenizer.from_pretrained(model_dir)
-        model_summarize = AutoModelForSeq2SeqLM.from_pretrained(model_dir)
-    else:
-        print("🌐 모델 다운로드 중...")
-        tokenizer_summarize = AutoTokenizer.from_pretrained(model_name)
-        model_summarize = AutoModelForSeq2SeqLM.from_pretrained(
-            model_name, use_safetensors=True
-        )
-
-        print("💾 모델 로컬 저장...")
-        tokenizer_summarize.save_pretrained(model_dir)
-        model_summarize.save_pretrained(model_dir)
-
-    # 모델 디바이스 할당
-    model_summarize.to(device)
-
-    return tokenizer_summarize, model_summarize, device
-
-
-def summarize_event_focused(text, tokenizer_summarize, model_summarize, device):
-    # 토크나이징 및 텐서 변환 (GPU로 올리기)
-    inputs = tokenizer_summarize(
-        text, return_tensors="pt", truncation=True, padding=True, max_length=512
+def summarize_event_focused(text, model_summarize, tokenizer_summarize):
+    # 토큰화
+    encoding = tokenizer_summarize(
+        text,
+        return_tensors="np",  # ONNX 모델 호환용
+        truncation=True,
     )
-    input_ids = inputs["input_ids"].to(device)
+
+    input_ids = encoding["input_ids"]
 
     text_length = len(text)
 
@@ -484,91 +451,77 @@ def summarize_event_focused(text, tokenizer_summarize, model_summarize, device):
     min_len = compute_min_length(text_length)
     max_len = round(text_length * 0.5) + 50  # 더 여유를 주되 max 길이 제한
 
-    # 2. generate 최적 설정
+    # 생성
     summary_ids = model_summarize.generate(
         input_ids,
-        min_length=min_len,
-        max_new_tokens=max_len,
-        num_beams=4,  # 4보다 빠름. 품질도 비슷
-        length_penalty=1.0,  # 길이 패널티 완화
-        repetition_penalty=1.3,  # 반복 억제 강화
-        no_repeat_ngram_size=3,  # 반복 문장 방지
-        early_stopping=True,
-        do_sample=False,  # 일관된 요약
+        min_length=min_len,  # 최소 요약 길이 (예: 30)
+        max_new_tokens=max_len,  # 추가 생성 최대 토큰 수
+        num_beams=4,  # 빔 서치 개수
+        length_penalty=1.0,  # 너무 긴 문장 방지
+        repetition_penalty=1.3,  # 반복 억제
+        no_repeat_ngram_size=3,  # 동일한 3-gram 반복 금지
+        early_stopping=True,  # <eos> 토큰 생성 시 중단
+        # do_sample은 사용하지 않음 (ONNX 미지원)
+    )
+    summary = tokenizer_summarize.decode(
+        summary_ids[0].tolist(), skip_special_tokens=True
     )
 
-    article_summarized = tokenizer_summarize.decode(
-        summary_ids[0], skip_special_tokens=True
-    )
-
-    return article_summarized
+    return summary
 
 
-def get_ner_pipeline(model_name="KPF/KPF-BERT-NER", local_dir="models/ner"):
-    # 디바이스 설정
-    device = 0 if torch.cuda.is_available() else -1
+def get_ner_tokens(tokenizer, session, text, id2label):
+    # 🟡 토큰화 및 입력값 준비
+    encoding = tokenizer.encode(text)
+    input_ids = np.array([encoding.ids], dtype=np.int64)
+    attention_mask = np.ones_like(input_ids, dtype=np.int64)
+    token_type_ids = np.zeros_like(input_ids, dtype=np.int64)
 
-    # 로컬 경로에 모델이 없으면 다운로드
-    if not os.path.exists(local_dir):
-        print("🔽 NER 모델 로컬에 없음. 다운로드 중...")
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForTokenClassification.from_pretrained(
-            model_name, use_safetensors=True
-        )
+    # 🔵 ONNX 추론 실행
+    inputs = {
+        "input_ids": input_ids,
+        "attention_mask": attention_mask,
+        "token_type_ids": token_type_ids,
+    }
 
-        # 저장
-        tokenizer.save_pretrained(local_dir)
-        model.save_pretrained(local_dir)
-    else:
-        print("📦 로컬에서 NER 모델 불러오는 중...")
-        tokenizer = AutoTokenizer.from_pretrained(local_dir)
-        model = AutoModelForTokenClassification.from_pretrained(local_dir)
+    logits = session.run(None, inputs)[0]  # shape: (1, seq_len, num_labels)
 
-    # 라벨 매핑
-    model.config.label2id = label2id
-    model.config.id2label = id2label
+    # 🔵 라벨 인덱스 → 실제 라벨명
+    preds = np.argmax(logits, axis=-1)[0]
+    labels = [id2label[p] for p in preds[: len(encoding.tokens)]]
 
-    # max length 설정
-    tokenizer.model_max_length = 512
+    # 🔵 시각화
+    tokens = encoding.tokens
 
-    # NER pipeline 생성
-    ner_pipe = pipeline(
-        task="ner",
-        model=model,
-        tokenizer=tokenizer,
-        aggregation_strategy="simple",
-        framework="pt",
-        device=device,
-    )
-
-    return ner_pipe
+    return tokens, labels
 
 
-def extract_ner(ner_pipeline, text):
-    entities = ner_pipeline(text)
-    results = []
-    seen = set()
+def extract_ogg_economy(tokens, labels, target_label="OGG_ECONOMY"):
+    merged_words = []
+    current_word = ""
 
-    for ent in entities:
-        word = ent["word"].replace("##", "").strip()
-        tag = ent["entity_group"]
+    for token, label in zip(tokens, labels):
+        token_clean = token.replace("##", "") if token.startswith("##") else token
 
-        score = ent["score"]
+        if label == f"B-{target_label}":
+            if current_word:
+                merged_words.append(current_word)
+            current_word = token_clean
 
-        if word and score >= 0.95 and (word, tag) not in seen:
-            results.append((word, tag))
-            seen.add((word, tag))
+        elif label == f"I-{target_label}":
+            current_word += token_clean
 
-    return results
+        else:
+            if current_word:
+                merged_words.append(current_word)
+                current_word = ""
 
+    if current_word:
+        merged_words.append(current_word)
 
-def get_stock_names(ner_pipeline, text):
-    ner_list = extract_ner(ner_pipeline, text)
+    stock_list = merged_words.copy()
 
-    # OGG_ECONOMY만 필터링하여 종목명만 리스트로 추출
-    stock_names = [ent[0] for ent in ner_list if ent[1] == "OGG_ECONOMY"]
-
-    return stock_names
+    return stock_list
 
 
 # 종목명 집합 불러오기
