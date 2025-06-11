@@ -67,6 +67,114 @@ BEGIN
     END IF;
 END $$;
 
+-- news_v2_external 테이블 생성 (news_id에 외래키 제약조건 추가)
+CREATE TABLE news_v2_external (
+  news_id VARCHAR PRIMARY KEY,
+
+  d_minus_14_date_close FLOAT,
+  d_minus_14_date_volume FLOAT,
+  d_minus_14_date_foreign FLOAT,
+  d_minus_14_date_institution FLOAT,
+  d_minus_14_date_individual FLOAT,
+
+  d_minus_7_date_close FLOAT,
+  d_minus_7_date_volume FLOAT,
+  d_minus_7_date_foreign FLOAT,
+  d_minus_7_date_institution FLOAT,
+  d_minus_7_date_individual FLOAT,
+
+  d_minus_3_date_close FLOAT,
+  d_minus_3_date_volume FLOAT,
+  d_minus_3_date_foreign FLOAT,
+  d_minus_3_date_institution FLOAT,
+  d_minus_3_date_individual FLOAT,
+
+  d_minus_2_date_close FLOAT,
+  d_minus_2_date_volume FLOAT,
+  d_minus_2_date_foreign FLOAT,
+  d_minus_2_date_institution FLOAT,
+  d_minus_2_date_individual FLOAT,
+
+  d_minus_1_date_close FLOAT,
+  d_minus_1_date_volume FLOAT,
+  d_minus_1_date_foreign FLOAT,
+  d_minus_1_date_institution FLOAT,
+  d_minus_1_date_individual FLOAT,
+
+  d_day_date_close FLOAT,
+  d_day_date_volume FLOAT,
+  d_day_date_foreign FLOAT,
+  d_day_date_institution FLOAT,
+  d_day_date_individual FLOAT,
+
+  d_plus_1_date_close FLOAT,
+  d_plus_1_date_volume FLOAT,
+  d_plus_1_date_foreign FLOAT,
+  d_plus_1_date_institution FLOAT,
+  d_plus_1_date_individual FLOAT,
+
+  d_plus_2_date_close FLOAT,
+  d_plus_2_date_volume FLOAT,
+  d_plus_2_date_foreign FLOAT,
+  d_plus_2_date_institution FLOAT,
+  d_plus_2_date_individual FLOAT,
+
+  d_plus_3_date_close FLOAT,
+  d_plus_3_date_volume FLOAT,
+  d_plus_3_date_foreign FLOAT,
+  d_plus_3_date_institution FLOAT,
+  d_plus_3_date_individual FLOAT,
+
+  d_plus_7_date_close FLOAT,
+  d_plus_7_date_volume FLOAT,
+  d_plus_7_date_foreign FLOAT,
+  d_plus_7_date_institution FLOAT,
+  d_plus_7_date_individual FLOAT,
+
+  d_plus_14_date_close FLOAT,
+  d_plus_14_date_volume FLOAT,
+  d_plus_14_date_foreign FLOAT,
+  d_plus_14_date_institution FLOAT,
+  d_plus_14_date_individual FLOAT,
+
+  d_day_date_open FLOAT,
+  d_day_change_open FLOAT,
+  d_day_change FLOAT,
+
+  fx FLOAT,
+  bond10y FLOAT,
+  base_rate FLOAT,
+
+  CONSTRAINT fk_news_id FOREIGN KEY (news_id) REFERENCES news_v2(news_id) ON DELETE CASCADE
+);
+
+
+
+DO $$
+BEGIN
+    IF (SELECT COUNT(*) FROM news_v2_external) = 0 THEN
+        COPY news_v2_external (
+            news_id,
+            d_minus_14_date_close, d_minus_14_date_volume, d_minus_14_date_foreign, d_minus_14_date_institution, d_minus_14_date_individual,
+            d_minus_7_date_close, d_minus_7_date_volume, d_minus_7_date_foreign, d_minus_7_date_institution, d_minus_7_date_individual,
+            d_minus_3_date_close, d_minus_3_date_volume, d_minus_3_date_foreign, d_minus_3_date_institution, d_minus_3_date_individual,
+            d_minus_2_date_close, d_minus_2_date_volume, d_minus_2_date_foreign, d_minus_2_date_institution, d_minus_2_date_individual,
+            d_minus_1_date_close, d_minus_1_date_volume, d_minus_1_date_foreign, d_minus_1_date_institution, d_minus_1_date_individual,
+            d_day_date_close, d_day_date_volume, d_day_date_foreign, d_day_date_institution, d_day_date_individual,
+            d_plus_1_date_close, d_plus_1_date_volume, d_plus_1_date_foreign, d_plus_1_date_institution, d_plus_1_date_individual,
+            d_plus_2_date_close, d_plus_2_date_volume, d_plus_2_date_foreign, d_plus_2_date_institution, d_plus_2_date_individual,
+            d_plus_3_date_close, d_plus_3_date_volume, d_plus_3_date_foreign, d_plus_3_date_institution, d_plus_3_date_individual,
+            d_plus_7_date_close, d_plus_7_date_volume, d_plus_7_date_foreign, d_plus_7_date_institution, d_plus_7_date_individual,
+            d_plus_14_date_close, d_plus_14_date_volume, d_plus_14_date_foreign, d_plus_14_date_institution, d_plus_14_date_individual,
+            d_day_date_open, d_day_change_open, d_day_change,
+            fx, bond10y, base_rate
+        )
+        FROM '/docker-entrypoint-initdb.d/news_2023_2025_external.csv'
+        WITH (FORMAT csv, HEADER true);
+    END IF;
+END $$;
+
+
 -- reports 테이블 생성
 CREATE TABLE IF NOT EXISTS reports (
     report_id SERIAL PRIMARY KEY,
