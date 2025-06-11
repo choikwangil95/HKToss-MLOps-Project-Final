@@ -644,12 +644,14 @@ def send_to_redis(news_data):
             log.error("Redis 서버에 연결할 수 없습니다.")
             return
 
+        wdate = datetime.strptime(news["wdate"], "%Y-%m-%d %H:%M").isoformat()
+
         # Redis에 저장
         for news in news_data:
             channel = "news-channel"
             data = {
                 "news_id": news["news_id"],
-                "wdate": news["wdate"],
+                "wdate": wdate,
                 "title": news["title"],
                 "article": news["article"],
                 "press": news["press"],
