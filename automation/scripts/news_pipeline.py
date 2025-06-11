@@ -263,8 +263,8 @@ def save_to_db_metadata(articles):
         cur = conn.cursor()
 
         insert_query = """
-		INSERT INTO news_v2_metadata (news_id, summary, stock_list, industry_list)
-		VALUES (%s, %s, %s, %s)
+		INSERT INTO news_v2_metadata (news_id, summary, stock_list, industry_list, impact_score)
+		VALUES (%s, %s, %s, %s, %s)
 		ON CONFLICT (news_id) DO NOTHING;
 		"""
 
@@ -284,6 +284,7 @@ def save_to_db_metadata(articles):
                     if article["industry_list"] is not None
                     else None
                 ),
+                None,  # impact_score는 아직 계산되지 않음
             )
             for article in articles
         ]

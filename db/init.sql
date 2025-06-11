@@ -54,13 +54,14 @@ CREATE TABLE news_v2_metadata (
   summary TEXT,
   stock_list JSON,
   industry_list JSON,
+  impact_score FLOAT,
   CONSTRAINT fk_news_id FOREIGN KEY (news_id) REFERENCES news_v2(news_id) ON DELETE CASCADE
 );
 
 DO $$
 BEGIN
     IF (SELECT COUNT(*) FROM news_v2_metadata) = 0 THEN
-        COPY news_v2_metadata(news_id, summary, stock_list, industry_list)
+        COPY news_v2_metadata(news_id, summary, stock_list, industry_list, impact_score)
         FROM '/docker-entrypoint-initdb.d/news_2023_2025_metadata.csv'
         WITH (FORMAT csv, HEADER true);
     END IF;

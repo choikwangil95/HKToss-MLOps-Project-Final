@@ -76,6 +76,7 @@ class NewsOut_v2_Metadata(BaseModel):
     summary: str
     stock_list: Optional[List[str]] = []  # None이면 빈 리스트
     industry_list: Optional[List[str]] = []  # None이면 빈 리스트
+    impact_score: Optional[float]
 
     class Config:
         orm_mode = True

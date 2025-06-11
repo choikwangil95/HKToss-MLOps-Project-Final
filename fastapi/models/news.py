@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Date, Text, Integer, ARRAY, DateTime, JSON
+from sqlalchemy import Column, String, Date, Text, Integer, ARRAY, DateTime, JSON, Float
 from sqlalchemy.ext.declarative import declarative_base
 from pgvector.sqlalchemy import Vector
 
@@ -39,6 +39,7 @@ class NewsModel_v2_Metadata(Base):
     summary = Column(Text)  # summary TEXT
     stock_list = Column(JSON)  # JSON으로 변경
     industry_list = Column(JSON)
+    impact_score = Column(Float)  # impact_score FLOAT, 영향 점수 (예: 0.75, 0.85 등)
 
 
 class ReportModel(Base):
