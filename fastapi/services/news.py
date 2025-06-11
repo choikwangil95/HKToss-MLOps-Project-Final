@@ -99,7 +99,7 @@ def get_news_detail_v2_metadata(db: Session, news_id: str):
         "stock_list": news.stock_list,
         "industry_list": news.industry_list,
         "impact_score": (
-            f"{news.impact_score:.2f}" if news.impact_score is not None else None
+            f"{news.impact_score:.3f}" if news.impact_score is not None else None
         ),
     }
 

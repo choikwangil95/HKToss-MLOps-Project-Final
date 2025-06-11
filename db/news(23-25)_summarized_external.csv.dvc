@@ -1,0 +1,5 @@
+outs:
+- md5: d6dbd802a44c7f77a1db3cf411ba37e3
+  size: 295065523
+  hash: md5
+  path: news(23-25)_summarized_external.csv

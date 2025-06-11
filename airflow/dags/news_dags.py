@@ -2,6 +2,8 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime
 import requests
+from bs4 import SoupStrainer
+import os
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
 import os
@@ -34,8 +36,10 @@ dag = DAG(
 # 📌 유틸 함수
 # ──────────────────────────────
 
+
 def parse_wdate(text):
     return datetime.strptime(text, "%Y-%m-%d %H:%M")
+
 
 def convert_to_public_url(href):
     parsed = urlparse(href)
@@ -45,6 +49,7 @@ def convert_to_public_url(href):
     if article_id and office_id:
         return f"https://n.news.naver.com/mnews/article/{office_id}/{article_id}"
     return href
+
 
 def get_random_headers():
     user_agents = [
@@ -64,6 +69,7 @@ def get_random_headers():
         "Upgrade-Insecure-Requests": "1",
     }
 
+
 def safe_soup_parse(text, timeout=3):
     def parse():
         return BeautifulSoup(text, "lxml")
@@ -79,11 +85,15 @@ def safe_soup_parse(text, timeout=3):
             log.error(f"❌ soup 파싱 실패: {type(e).__name__}: {e}")
             return None
 
+
 def get_retry_session():
     session = requests.Session()
-    retries = Retry(total=3, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504])
+    retries = Retry(
+        total=3, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504]
+    )
     session.mount("https://", HTTPAdapter(max_retries=retries))
     return session
+
 
 def fetch_article_details(url):
     try:
@@ -103,10 +113,16 @@ def fetch_article_details(url):
         log.info("✅ soup 생성 완료")
 
         image_tag = soup.select_one('meta[property="og:image"]')
-        image = image_tag["content"] if image_tag and image_tag.has_attr("content") else None
+        image = (
+            image_tag["content"]
+            if image_tag and image_tag.has_attr("content")
+            else None
+        )
 
         article_tag = soup.select_one("article#dic_area")
-        article = article_tag.get_text(strip=True, separator="\n") if article_tag else ""
+        article = (
+            article_tag.get_text(strip=True, separator="\n") if article_tag else ""
+        )
 
         log.info(f"✅ 추출 성공: 이미지 있음? {bool(image)}, 본문 길이: {len(article)}")
 
@@ -118,6 +134,7 @@ def fetch_article_details(url):
     except Exception as e:
         log.error(f"❌ 전체 fetch 실패 - {url}: {type(e).__name__}: {e}")
         return None, ""
+
 
 def get_or_create_last_time(filepath: str) -> str:
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -138,6 +155,7 @@ def get_or_create_last_time(filepath: str) -> str:
         log.error(f"❌ 시간 읽기/쓰기 실패 ({type(e).__name__}): {e}")
         return now_str
 
+
 def save_latest_time(filepath: str, time_str: str):
     try:
         with open(filepath, "w") as f:
@@ -146,9 +164,11 @@ def save_latest_time(filepath: str, time_str: str):
     except Exception as e:
         log.error(f"❌ 시간 저장 실패 ({type(e).__name__}): {e}")
 
+
 # ──────────────────────────────
 # 📌 뉴스 수집 메인 함수
 # ──────────────────────────────
+
 
 def fetch_latest_news():
     try:
@@ -175,12 +195,9 @@ def fetch_latest_news():
             article_time_dt = parse_wdate(wdate)
 
             if article_time_dt > last_time_dt:
-                new_articles.append({
-                    "title": title,
-                    "url": url,
-                    "press": press,
-                    "wdate": wdate
-                })
+                new_articles.append(
+                    {"title": title, "url": url, "press": press, "wdate": wdate}
+                )
         except Exception as e:
             log.error(f"❌ 개별 뉴스 파싱 실패 ({type(e).__name__}): {e}")
 
@@ -195,7 +212,9 @@ def fetch_latest_news():
                 log.info(f"\n📰 기사 처리 중: {article['title']}")
                 image, article_text = fetch_article_details(article["url"])
                 preview = article_text[:300] if isinstance(article_text, str) else ""
-                log.info(f"[NEW] {article['wdate']} - {article['title']} ({article['press']})")
+                log.info(
+                    f"[NEW] {article['wdate']} - {article['title']} ({article['press']})"
+                )
                 log.info(f"{preview}...\n")
             except Exception as e:
                 log.error(f"❌ 본문 파싱 실패 ({type(e).__name__}): {e}")
@@ -203,6 +222,7 @@ def fetch_latest_news():
         log.info("⏰ 새 뉴스 없음")
 
     return new_articles
+
 
 # ──────────────────────────────
 # 📌 DAG 등록

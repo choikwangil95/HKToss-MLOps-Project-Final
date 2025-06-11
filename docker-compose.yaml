@@ -14,80 +14,18 @@ services:
       - ./fastapi:/fastapi
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # airflow-webserver:
-  #   image: apache/airflow:2.7.2
-  #   container_name: airflow-webserver
-  #   mem_limit: 2g
-  #   restart: on-failure
-  #   entrypoint: [ "/bin/bash", "/entrypoint.sh" ]
-  #   command: [ "webserver" ]
-  #   environment:
-  #     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-  #     AIRFLOW__CORE__FERNET_KEY: ""
-  #     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
-  #     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-  #     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:password@db:5432/postgres
-  #     AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
-  #     AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
-  #     AIRFLOW__LOGGING__DAG_PROCESSOR_MANAGER_LOG_LOCATION: /opt/airflow/logs/dag_processor_manager/dag_processor_manager.log
-  #     REDIS_HOST: redis
-  #     REDIS_PORT: 6379
+  # automation:
+  #   build:
+  #     context: ./automation
+  #     dockerfile: Dockerfile
+  #   container_name: automation
   #   depends_on:
   #     - db
-  #   ports:
-  #     - "8080:8080"
-  #   volumes:
-  #     - ./airflow/dags:/opt/airflow/dags
-  #     - ./airflow/logs:/opt/airflow/logs
-  #     - ./airflow/plugins:/opt/airflow/plugins
-  #     - ./airflow/requirements.txt:/requirements.txt
-  #     - ./airflow/entrypoint.sh:/entrypoint.sh
-
-  # airflow-scheduler:
-  #   image: apache/airflow:2.7.2
-  #   container_name: airflow-scheduler
-  #   restart: on-failure
-  #   mem_limit: 512m
-  #   entrypoint: [ "/bin/bash", "/entrypoint.sh" ]
-  #   command: [ "scheduler" ]
   #   environment:
-  #     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-  #     AIRFLOW__CORE__FERNET_KEY: ""
-  #     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
-  #     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-  #     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:password@db:5432/postgres
-  #     AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
-  #     AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
-  #     AIRFLOW__LOGGING__DAG_PROCESSOR_MANAGER_LOG_LOCATION: /opt/airflow/logs/dag_processor_manager/dag_processor_manager.log
-  #     REDIS_HOST: redis
-  #     REDIS_PORT: 6379
-  #   depends_on:
-  #     - db
+  #     - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
   #   volumes:
-  #     - ./airflow/dags:/opt/airflow/dags
-  #     - ./airflow/logs:/opt/airflow/logs
-  #     - ./airflow/plugins:/opt/airflow/plugins
-  #     - ./airflow/requirements.txt:/requirements.txt
-  #     - ./airflow/entrypoint.sh:/entrypoint.sh
+  #     - ./automation:/automation
 
-  automation:
-    build:
-      context: ./automation
-      dockerfile: Dockerfile
-    container_name: automation
-    depends_on:
-      - db
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
-    volumes:
-      - ./automation:/automation
-
-  # redis:
-  #   image: redis:7.2
-  #   container_name: redis-server
-  #   ports:
-  #     - "6379:6379"
-  #   restart: on-failure
   db:
     image: ankane/pgvector
     container_name: postgres-db
@@ -102,6 +40,62 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db:/docker-entrypoint-initdb.d
+
+# airflow-webserver:
+#   image: apache/airflow:2.7.2
+#   container_name: airflow-webserver
+#   mem_limit: 2g
+#   restart: on-failure
+#   entrypoint: [ "/bin/bash", "/entrypoint.sh" ]
+#   command: [ "webserver" ]
+#   environment:
+#     AIRFLOW__CORE__EXECUTOR: LocalExecutor
+#     AIRFLOW__CORE__FERNET_KEY: ""
+#     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+#     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+#     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:password@db:5432/postgres
+#     AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
+#     AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+#     AIRFLOW__LOGGING__DAG_PROCESSOR_MANAGER_LOG_LOCATION: /opt/airflow/logs/dag_processor_manager/dag_processor_manager.log
+#     REDIS_HOST: redis
+#     REDIS_PORT: 6379
+#   depends_on:
+#     - db
+#   ports:
+#     - "8080:8080"
+#   volumes:
+#     - ./airflow/dags:/opt/airflow/dags
+#     - ./airflow/logs:/opt/airflow/logs
+#     - ./airflow/plugins:/opt/airflow/plugins
+#     - ./airflow/requirements.txt:/requirements.txt
+#     - ./airflow/entrypoint.sh:/entrypoint.sh
+
+# airflow-scheduler:
+#   image: apache/airflow:2.7.2
+#   container_name: airflow-scheduler
+#   restart: on-failure
+#   mem_limit: 512m
+#   entrypoint: [ "/bin/bash", "/entrypoint.sh" ]
+#   command: [ "scheduler" ]
+#   environment:
+#     AIRFLOW__CORE__EXECUTOR: LocalExecutor
+#     AIRFLOW__CORE__FERNET_KEY: ""
+#     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+#     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+#     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:password@db:5432/postgres
+#     AIRFLOW__LOGGING__REMOTE_LOGGING: "False"
+#     AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+#     AIRFLOW__LOGGING__DAG_PROCESSOR_MANAGER_LOG_LOCATION: /opt/airflow/logs/dag_processor_manager/dag_processor_manager.log
+#     REDIS_HOST: redis
+#     REDIS_PORT: 6379
+#   depends_on:
+#     - db
+#   volumes:
+#     - ./airflow/dags:/opt/airflow/dags
+#     - ./airflow/logs:/opt/airflow/logs
+#     - ./airflow/plugins:/opt/airflow/plugins
+#     - ./airflow/requirements.txt:/requirements.txt
+#     - ./airflow/entrypoint.sh:/entrypoint.sh
 
 volumes:
   postgres_data:
