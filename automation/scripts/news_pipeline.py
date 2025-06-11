@@ -635,7 +635,7 @@ def predict_topic_for_df(df, vectorizer, lda_model, stopwords, n_topics=9):
 def send_to_redis(news_data):
     try:
         r = redis.Redis(
-            host="43.200.17.139",
+            host="100.68.180.102",
             port=6379,
             password="q1w2e3r4!@#",
             decode_responses=True,  # bytes 대신 str 로 받기
