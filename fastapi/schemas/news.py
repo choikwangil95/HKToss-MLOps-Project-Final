@@ -1,7 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, Field
 from typing import Optional
 from datetime import datetime, date
 from typing import List, Union
+from pydantic import validator
+import ast
 
 
 class News(BaseModel):
@@ -64,6 +66,117 @@ class NewsOut_v2(BaseModel):
     url: Optional[str]
     press: str
     image: str
+
+    class Config:
+        orm_mode = True
+
+
+class NewsOut_v2_Metadata(BaseModel):
+    news_id: str
+    summary: str
+    stock_list: Optional[List[str]] = []  # None이면 빈 리스트
+    industry_list: Optional[List[str]] = []  # None이면 빈 리스트
+    impact_score: Optional[float]
+
+    class Config:
+        orm_mode = True
+
+    @field_validator("stock_list", "industry_list", mode="before")
+    @classmethod
+    def parse_list(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            try:
+                return ast.literal_eval(v)
+            except Exception:
+                return [v]
+        return v
+
+
+from typing import Optional
+from pydantic import BaseModel
+
+
+class NewsOut_v2_External(BaseModel):
+    news_id: str
+
+    d_minus_14_date_close: Optional[float]
+    d_minus_14_date_volume: Optional[float]
+    d_minus_14_date_foreign: Optional[float]
+    d_minus_14_date_institution: Optional[float]
+    d_minus_14_date_individual: Optional[float]
+
+    d_minus_7_date_close: Optional[float]
+    d_minus_7_date_volume: Optional[float]
+    d_minus_7_date_foreign: Optional[float]
+    d_minus_7_date_institution: Optional[float]
+    d_minus_7_date_individual: Optional[float]
+
+    d_minus_3_date_close: Optional[float]
+    d_minus_3_date_volume: Optional[float]
+    d_minus_3_date_foreign: Optional[float]
+    d_minus_3_date_institution: Optional[float]
+    d_minus_3_date_individual: Optional[float]
+
+    d_minus_2_date_close: Optional[float]
+    d_minus_2_date_volume: Optional[float]
+    d_minus_2_date_foreign: Optional[float]
+    d_minus_2_date_institution: Optional[float]
+    d_minus_2_date_individual: Optional[float]
+
+    d_minus_1_date_close: Optional[float]
+    d_minus_1_date_volume: Optional[float]
+    d_minus_1_date_foreign: Optional[float]
+    d_minus_1_date_institution: Optional[float]
+    d_minus_1_date_individual: Optional[float]
+
+    d_day_date_close: Optional[float]
+    d_day_date_volume: Optional[float]
+    d_day_date_foreign: Optional[float]
+    d_day_date_institution: Optional[float]
+    d_day_date_individual: Optional[float]
+
+    d_plus_1_date_close: Optional[float]
+    d_plus_1_date_volume: Optional[float]
+    d_plus_1_date_foreign: Optional[float]
+    d_plus_1_date_institution: Optional[float]
+    d_plus_1_date_individual: Optional[float]
+
+    d_plus_2_date_close: Optional[float]
+    d_plus_2_date_volume: Optional[float]
+    d_plus_2_date_foreign: Optional[float]
+    d_plus_2_date_institution: Optional[float]
+    d_plus_2_date_individual: Optional[float]
+
+    d_plus_3_date_close: Optional[float]
+    d_plus_3_date_volume: Optional[float]
+    d_plus_3_date_foreign: Optional[float]
+    d_plus_3_date_institution: Optional[float]
+    d_plus_3_date_individual: Optional[float]
+
+    d_plus_7_date_close: Optional[float]
+    d_plus_7_date_volume: Optional[float]
+    d_plus_7_date_foreign: Optional[float]
+    d_plus_7_date_institution: Optional[float]
+    d_plus_7_date_individual: Optional[float]
+
+    d_plus_14_date_close: Optional[float]
+    d_plus_14_date_volume: Optional[float]
+    d_plus_14_date_foreign: Optional[float]
+    d_plus_14_date_institution: Optional[float]
+    d_plus_14_date_individual: Optional[float]
+
+    d_day_date_open: Optional[float]
+    d_day_change_open: Optional[float]
+    d_day_change: Optional[float]
+
+    fx: Optional[float]
+    bond10y: Optional[float]
+    base_rate: Optional[float]
+
+    class Config:
+        from_attributes = True  # ORM 지원
 
 
 #############################

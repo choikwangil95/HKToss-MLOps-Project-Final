@@ -49,7 +49,7 @@ jobs:
 
             if [ ! -d ".git" ]; then
               echo "📦 Git 저장소 클론 중..."
-              git init
+              git init -b main
               git remote add origin ${{ secrets.GIT_REPOSITORY_URL}}
             else
               echo "✅ Pull latest code..."

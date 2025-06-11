@@ -1,7 +1,13 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from models.news import NewsModel, NewsModel_v2, ReportModel
-from schemas.news import News
+from models.news import (
+    NewsModel,
+    NewsModel_v2,
+    NewsModel_v2_External,
+    NewsModel_v2_Metadata,
+    ReportModel,
+)
+from schemas.news import News, NewsOut_v2_External
 from datetime import timedelta
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
@@ -54,9 +60,7 @@ def get_news_list_v2(
     if end_datetime:
         query = query.filter(NewsModel_v2.wdate <= end_datetime)
 
-    news_list = (
-        query.order_by(desc(NewsModel_v2.news_id)).offset(skip).limit(limit).all()
-    )
+    news_list = query.order_by(desc(NewsModel_v2.wdate)).offset(skip).limit(limit).all()
 
     return news_list
 
@@ -77,6 +81,42 @@ def get_news_detail_v2(db: Session, news_id: str):
         return None
 
     return news
+
+
+def get_news_detail_v2_metadata(db: Session, news_id: str):
+    news = (
+        db.query(NewsModel_v2_Metadata)
+        .filter(NewsModel_v2_Metadata.news_id == news_id)
+        .first()
+    )
+
+    if news is None:
+        raise HTTPException(status_code=404, detail="News not found")
+
+    return {
+        "news_id": news.news_id,
+        "summary": news.summary,
+        "stock_list": news.stock_list,
+        "industry_list": news.industry_list,
+        "impact_score": (
+            f"{news.impact_score:.2f}" if news.impact_score is not None else None
+        ),
+    }
+
+
+def get_news_detail_v2_external(db: Session, news_id: str):
+    news = (
+        db.query(NewsModel_v2_External)
+        .filter(NewsModel_v2_External.news_id == news_id)
+        .first()
+    )
+
+    print(news)
+
+    if news is None:
+        raise HTTPException(status_code=404, detail="News not found")
+
+    return NewsOut_v2_External.model_validate(news)
 
 
 def find_news_similar(

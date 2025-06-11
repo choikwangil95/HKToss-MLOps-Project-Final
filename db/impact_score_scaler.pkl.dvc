@@ -1,0 +1,5 @@
+outs:
+- md5: 608e0201c1729ed7ba7f6b4fbb8a83d8
+  size: 719
+  hash: md5
+  path: impact_score_scaler.pkl

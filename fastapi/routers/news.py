@@ -7,12 +7,16 @@ from schemas.news import (
     News_v2,
     NewsOut,
     NewsOut_v2,
+    NewsOut_v2_External,
+    NewsOut_v2_Metadata,
     SimilarNews,
     Report,
     NewsStock,
     PastReportsResponse,
 )
 from services.news import (
+    get_news_detail_v2_external,
+    get_news_detail_v2_metadata,
     get_news_list,
     get_news_list_v2,
     get_news_detail,
@@ -37,7 +41,7 @@ router = APIRouter(
 @router.get(
     "/",
     response_model=list[NewsOut],
-    summary="[완료] 뉴스 목록 조회 (test)",
+    summary="[완료] 뉴스 목록 조회",
     description="최신 뉴스 기사를 페이지 단위로 조회합니다.",
 )
 def list_news(
@@ -70,62 +74,9 @@ def list_news(
 
 
 @router.get(
-    "/v2",
-    response_model=list[NewsOut_v2],
-    summary="[완료] 뉴스 목록 조회 (production)",
-    description="최신 뉴스 기사를 페이지 단위로 조회합니다.",
-)
-def list_news_v2(
-    skip: int = Query(0, description="건너뛸 뉴스 개수 (페이지네이션용)", ge=0),
-    limit: int = Query(20, description="가져올 뉴스 개수", le=100),
-    title: Optional[str] = Query(
-        None, description="뉴스 제목 필터링 (부분 일치)", max_length=50
-    ),
-    start_datetime: Optional[datetime] = Query(
-        None, description="시작 일시 (예: 2025-05-01T00:00:00)"
-    ),
-    end_datetime: Optional[datetime] = Query(
-        None, description="종료 일시 (예: 2025-05-31T23:59:59)"
-    ),
-    db: Session = Depends(get_db),
-):
-    """
-    뉴스 목록을 조회합니다.
-    - `title`: 뉴스 제목 부분 일치
-    - `start_date`: 조회 시작 시각 (ISO 8601, 예: 2025-05-01T00:00:00)
-    - `end_date`: 조회 종료 시각 (ISO 8601, 예: 2025-05-31T23:59:59)
-    """
-    return get_news_list_v2(
-        db=db,
-        skip=skip,
-        limit=limit,
-        title=title,
-        start_datetime=start_datetime,
-        end_datetime=end_datetime,
-    )
-
-
-@router.get(
-    "/highlights",
-    response_model=list[NewsOut],
-    summary="[예정] 주요 뉴스 목록 조회",
-    description="주요 뉴스 기사를 조회합니다.",
-    include_in_schema=True,
-)
-def get_highlighted_news():
-    """
-    주요 뉴스 목록을 조회합니다.
-    """
-    return JSONResponse(
-        status_code=501,
-        content={"message": "주요 뉴스 목록 조회 API는 현재 준비 중입니다."},
-    )
-
-
-@router.get(
     "/{news_id}",
     response_model=NewsOut,
-    summary="[완료] 뉴스 상세 조회 (test)",
+    summary="[완료] 뉴스 상세 조회",
     description="뉴스 ID를 기반으로 해당 뉴스 기사의 상세 정보를 조회합니다.",
 )
 def news_detail(
@@ -136,22 +87,6 @@ def news_detail(
     특정 뉴스의 상세 정보를 조회합니다.
     """
     return get_news_detail(db, news_id)
-
-
-@router.get(
-    "/v2/{news_id}",
-    response_model=NewsOut_v2,
-    summary="[완료] 뉴스 상세 조회 (production)",
-    description="뉴스 ID를 기반으로 해당 뉴스 기사의 상세 정보를 조회합니다.",
-)
-def news_detail(
-    news_id: str = Path(..., description="뉴스 고유 ID"),
-    db: Session = Depends(get_db),
-):
-    """
-    특정 뉴스의 상세 정보를 조회합니다.
-    """
-    return get_news_detail_v2(db, news_id)
 
 
 @router.get(
@@ -225,3 +160,109 @@ def matched_stock(
     """
 
     return find_stock_effected(db, news_id)
+
+
+router_v2 = APIRouter(
+    prefix="/news/v2", tags=["News_v2"], responses={404: {"description": "Not found"}}
+)
+
+
+@router_v2.get(
+    "/",
+    response_model=list[NewsOut_v2],
+    summary="[완료] 뉴스 목록 조회",
+    description="최신 뉴스 기사를 페이지 단위로 조회합니다.",
+)
+def list_news_v2(
+    skip: int = Query(0, description="건너뛸 뉴스 개수 (페이지네이션용)", ge=0),
+    limit: int = Query(20, description="가져올 뉴스 개수", le=100),
+    title: Optional[str] = Query(
+        None, description="뉴스 제목 필터링 (부분 일치)", max_length=50
+    ),
+    start_datetime: Optional[datetime] = Query(
+        None, description="시작 일시 (예: 2025-05-01T00:00:00)"
+    ),
+    end_datetime: Optional[datetime] = Query(
+        None, description="종료 일시 (예: 2025-05-31T23:59:59)"
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    뉴스 목록을 조회합니다.
+    - `title`: 뉴스 제목 부분 일치
+    - `start_date`: 조회 시작 시각 (ISO 8601, 예: 2025-05-01T00:00:00)
+    - `end_date`: 조회 종료 시각 (ISO 8601, 예: 2025-05-31T23:59:59)
+    """
+    return get_news_list_v2(
+        db=db,
+        skip=skip,
+        limit=limit,
+        title=title,
+        start_datetime=start_datetime,
+        end_datetime=end_datetime,
+    )
+
+
+@router_v2.get(
+    "/highlights",
+    response_model=list[NewsOut],
+    summary="[예정] 주요 뉴스 목록 조회",
+    description="주요 뉴스 기사를 조회합니다.",
+    include_in_schema=True,
+)
+def get_highlighted_news():
+    """
+    주요 뉴스 목록을 조회합니다.
+    """
+    return JSONResponse(
+        status_code=501,
+        content={"message": "주요 뉴스 목록 조회 API는 현재 준비 중입니다."},
+    )
+
+
+@router_v2.get(
+    "/{news_id}",
+    response_model=NewsOut_v2,
+    summary="[완료] 뉴스 상세 조회",
+    description="뉴스 ID를 기반으로 해당 뉴스 기사의 상세 정보를 조회합니다.",
+)
+def news_detail(
+    news_id: str = Path(..., description="뉴스 고유 ID"),
+    db: Session = Depends(get_db),
+):
+    """
+    특정 뉴스의 상세 정보를 조회합니다.
+    """
+    return get_news_detail_v2(db, news_id)
+
+
+@router_v2.get(
+    "/{news_id}/metadata",
+    response_model=NewsOut_v2_Metadata,
+    summary="[완료] 뉴스 상세 메타데이터 조회",
+    description="뉴스 ID를 기반으로 해당 뉴스 기사의 메타데이터 정보를 조회합니다.",
+)
+def news_detail_metadata(
+    news_id: str = Path(..., description="뉴스 고유 ID"),
+    db: Session = Depends(get_db),
+):
+    """
+    특정 뉴스 기사의 메타데이터 정보를 조회합니다.
+    """
+    return get_news_detail_v2_metadata(db, news_id)
+
+
+@router_v2.get(
+    "/{news_id}/external",
+    response_model=NewsOut_v2_External,
+    summary="[완료] 뉴스 상세 외부 변수 (주가, 거래량, 금리 추이) 조회",
+    description="뉴스 ID를 기반으로 해당 뉴스 기사의 외부 변수 (주가, 거래량, 금리 추이) 정보를 조회합니다.",
+)
+def news_detail_metadata(
+    news_id: str = Path(..., description="뉴스 고유 ID"),
+    db: Session = Depends(get_db),
+):
+    """
+    특정 뉴스 기사의 외부 변수 (주가, 거래량, 금리 추이) 정보를 조회합니다.
+    """
+    return get_news_detail_v2_external(db, news_id)

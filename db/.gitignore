@@ -35,3 +35,9 @@
 /dataset_2023_2025.csv
 /news_2023_2025_summarized_view.csv
 /kospi_description.csv
+/news(23-25)_summarized_external_clean.csv
+/news_2023_2025_summarized_view.csv
+/news_2023_2025_metadata.csv
+/news_2023_2025_raw.csv
+/impact_score_scaler.pkl
+/news_2023_2025_external.csv
