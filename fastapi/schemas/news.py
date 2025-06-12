@@ -101,17 +101,17 @@ from pydantic import BaseModel
 class NewsOut_v2_External(BaseModel):
     news_id: str
 
-    d_minus_14_date_close: Optional[float]
-    d_minus_14_date_volume: Optional[float]
-    d_minus_14_date_foreign: Optional[float]
-    d_minus_14_date_institution: Optional[float]
-    d_minus_14_date_individual: Optional[float]
+    d_minus_5_date_close: Optional[float]
+    d_minus_5_date_volume: Optional[float]
+    d_minus_5_date_foreign: Optional[float]
+    d_minus_5_date_institution: Optional[float]
+    d_minus_5_date_individual: Optional[float]
 
-    d_minus_7_date_close: Optional[float]
-    d_minus_7_date_volume: Optional[float]
-    d_minus_7_date_foreign: Optional[float]
-    d_minus_7_date_institution: Optional[float]
-    d_minus_7_date_individual: Optional[float]
+    d_minus_4_date_close: Optional[float]
+    d_minus_4_date_volume: Optional[float]
+    d_minus_4_date_foreign: Optional[float]
+    d_minus_4_date_institution: Optional[float]
+    d_minus_4_date_individual: Optional[float]
 
     d_minus_3_date_close: Optional[float]
     d_minus_3_date_volume: Optional[float]
@@ -131,45 +131,11 @@ class NewsOut_v2_External(BaseModel):
     d_minus_1_date_institution: Optional[float]
     d_minus_1_date_individual: Optional[float]
 
-    d_day_date_close: Optional[float]
-    d_day_date_volume: Optional[float]
-    d_day_date_foreign: Optional[float]
-    d_day_date_institution: Optional[float]
-    d_day_date_individual: Optional[float]
-
     d_plus_1_date_close: Optional[float]
-    d_plus_1_date_volume: Optional[float]
-    d_plus_1_date_foreign: Optional[float]
-    d_plus_1_date_institution: Optional[float]
-    d_plus_1_date_individual: Optional[float]
-
     d_plus_2_date_close: Optional[float]
-    d_plus_2_date_volume: Optional[float]
-    d_plus_2_date_foreign: Optional[float]
-    d_plus_2_date_institution: Optional[float]
-    d_plus_2_date_individual: Optional[float]
-
     d_plus_3_date_close: Optional[float]
-    d_plus_3_date_volume: Optional[float]
-    d_plus_3_date_foreign: Optional[float]
-    d_plus_3_date_institution: Optional[float]
-    d_plus_3_date_individual: Optional[float]
-
-    d_plus_7_date_close: Optional[float]
-    d_plus_7_date_volume: Optional[float]
-    d_plus_7_date_foreign: Optional[float]
-    d_plus_7_date_institution: Optional[float]
-    d_plus_7_date_individual: Optional[float]
-
-    d_plus_14_date_close: Optional[float]
-    d_plus_14_date_volume: Optional[float]
-    d_plus_14_date_foreign: Optional[float]
-    d_plus_14_date_institution: Optional[float]
-    d_plus_14_date_individual: Optional[float]
-
-    d_day_date_open: Optional[float]
-    d_day_change_open: Optional[float]
-    d_day_change: Optional[float]
+    d_plus_4_date_close: Optional[float]
+    d_plus_5_date_close: Optional[float]
 
     fx: Optional[float]
     bond10y: Optional[float]

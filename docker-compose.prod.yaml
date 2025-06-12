@@ -1,8 +1,6 @@
 services:
   fastapi:
-    build:
-      context: ./fastapi
-      dockerfile: Dockerfile # fastapi 디렉토리 내부로 이동
+    image: public.ecr.aws/s7y4j6x4/hktoss-mlops-final:latest
     container_name: fastapi-app
     ports:
       - "8000:8000"
@@ -12,19 +10,19 @@ services:
       - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
     volumes:
       - ./fastapi:/fastapi
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
 
-  #automation:
-  #  build:
-  #    context: ./automation
-  #    dockerfile: Dockerfile
-  #  container_name: automation
-  #  depends_on:
-  #    - db
-  #  environment:
-  #    - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
-  #  volumes:
-  #    - ./automation:/automation
+  automation:
+    build:
+      context: ./automation
+      dockerfile: Dockerfile
+    container_name: automation
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
+    volumes:
+      - ./automation:/automation
 
   db:
     image: ankane/pgvector

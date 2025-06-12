@@ -1,5 +1,5 @@
 outs:
-- md5: de3f751266fccce6d05a0a9b856020ba
-  size: 5564945
+- md5: 388d4829f3adf2b7e66f234d66f66f0b
+  size: 5402704
   hash: md5
   path: news_2023_2025_metadata.csv
