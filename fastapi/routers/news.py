@@ -266,7 +266,7 @@ async def news_detail_metadata(
     summary="[완료] 뉴스 상세 외부 변수 (주가, 거래량, 금리 추이) 조회",
     description="뉴스 ID를 기반으로 해당 뉴스 기사의 외부 변수 (주가, 거래량, 금리 추이) 정보를 조회합니다.",
 )
-async def news_detail_metadata(
+async def news_detail_external(
     news_id: str = Path(..., description="뉴스 고유 ID"),
     db: Session = Depends(get_db),
 ):

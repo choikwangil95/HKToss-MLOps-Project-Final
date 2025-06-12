@@ -1,6 +1,7 @@
 # Web server & routing
 fastapi
 uvicorn
+gunicorn
 starlette
 
 # Data processing & transformation
