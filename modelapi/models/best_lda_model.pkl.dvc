@@ -1,0 +1,5 @@
+outs:
+- md5: e7313ba76667ee9ae2b9e7657f9c926a
+  size: 147604
+  hash: md5
+  path: best_lda_model.pkl

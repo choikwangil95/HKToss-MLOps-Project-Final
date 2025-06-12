@@ -12,7 +12,8 @@ from kss import split_sentences
 import os
 import pandas as pd
 import re
-from konlpy.tag import Okt
+
+# from konlpy.tag import Okt
 import numpy as np
 import json
 import redis
@@ -440,116 +441,38 @@ def remove_market_related_sentences(text: str) -> str:
     return text_preprocessed
 
 
-def summarize_event_focused(
+def get_article_summary(
     text,
-    encoder_sess,
-    decoder_sess,
-    tokenizer,
-    max_length=128,
-    no_repeat_ngram_size=3,
-    repetition_penalty=1.2,
 ):
-    input_ids = tokenizer.encode(text).ids
-    input_ids_np = np.array([input_ids], dtype=np.int64)
-    attention_mask = np.ones_like(input_ids_np, dtype=np.int64)
+    url = "http://15.165.211.100:9000/summarize"  # 또는 EC2 내부/외부 주소
+    payload = {"article": text}
 
-    encoder_outputs = encoder_sess.run(
-        None, {"input_ids": input_ids_np, "attention_mask": attention_mask}
-    )[0]
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
 
-    decoder_input_ids = [tokenizer.token_to_id("<s>")]
-    generated_ids = decoder_input_ids.copy()
+        summary = response.json()["summary"]  # 또는 실제 리턴 필드에 따라 조정
 
-    for _ in range(max_length):
-        decoder_input_np = np.array([generated_ids], dtype=np.int64)
-        decoder_inputs = {
-            "input_ids": decoder_input_np,
-            "encoder_hidden_states": encoder_outputs,
-            "encoder_attention_mask": attention_mask,
-        }
-        logits = decoder_sess.run(None, decoder_inputs)[0]
-        next_token_logits = logits[:, -1, :]
+        return summary
 
-        # repetition penalty 적용
-        for token_id in set(generated_ids):
-            next_token_logits[0, token_id] /= repetition_penalty
-
-        # no_repeat_ngram_size 적용
-        if no_repeat_ngram_size > 0 and len(generated_ids) >= no_repeat_ngram_size:
-            ngram = tuple(generated_ids[-(no_repeat_ngram_size - 1) :])
-            banned = {
-                tuple(generated_ids[i : i + no_repeat_ngram_size])
-                for i in range(len(generated_ids) - no_repeat_ngram_size + 1)
-            }
-            for token_id in range(next_token_logits.shape[-1]):
-                if ngram + (token_id,) in banned:
-                    next_token_logits[0, token_id] = -1e9  # 큰 마이너스
-
-        # greedy 선택
-        next_token_id = int(np.argmax(next_token_logits, axis=-1)[0])
-
-        if next_token_id == tokenizer.token_to_id("</s>"):
-            break
-
-        generated_ids.append(next_token_id)
-
-    summary = tokenizer.decode(generated_ids, skip_special_tokens=True)
-
-    return summary
+    except Exception as e:
+        print(f"❌ 요약 요청 실패: {e}")
+        return ""
 
 
-def get_ner_tokens(tokenizer, session, text, id2label):
+def get_stock_list(text):
     # 🟡 토큰화 및 입력값 준비
-    encoding = tokenizer.encode(text)
-    input_ids = np.array([encoding.ids], dtype=np.int64)
-    attention_mask = np.ones_like(input_ids, dtype=np.int64)
-    token_type_ids = np.zeros_like(input_ids, dtype=np.int64)
 
-    # 🔵 ONNX 추론 실행
-    inputs = {
-        "input_ids": input_ids,
-        "attention_mask": attention_mask,
-        "token_type_ids": token_type_ids,
-    }
+    url = "http://15.165.211.100:9000/stock_list"
+    payload = {"article": text}
 
-    logits = session.run(None, inputs)[0]  # shape: (1, seq_len, num_labels)
-
-    # 🔵 라벨 인덱스 → 실제 라벨명
-    preds = np.argmax(logits, axis=-1)[0]
-    labels = [id2label[p] for p in preds[: len(encoding.tokens)]]
-
-    # 🔵 시각화
-    tokens = encoding.tokens
-
-    return tokens, labels
-
-
-def extract_ogg_economy(tokens, labels, target_label="OGG_ECONOMY"):
-    merged_words = []
-    current_word = ""
-
-    for token, label in zip(tokens, labels):
-        token_clean = token.replace("##", "") if token.startswith("##") else token
-
-        if label == f"B-{target_label}":
-            if current_word:
-                merged_words.append(current_word)
-            current_word = token_clean
-
-        elif label == f"I-{target_label}":
-            current_word += token_clean
-
-        else:
-            if current_word:
-                merged_words.append(current_word)
-                current_word = ""
-
-    if current_word:
-        merged_words.append(current_word)
-
-    stock_list = merged_words.copy()
-
-    return stock_list
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()["stock_list"]  # 혹은 API 응답 구조에 따라 조정
+    except Exception as e:
+        print(f"❌ 종목명 추출 실패: {e}")
+        return []
 
 
 # 종목명 집합 불러오기

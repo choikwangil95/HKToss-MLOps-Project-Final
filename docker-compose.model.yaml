@@ -1,0 +1,11 @@
+services:
+  modelapi:
+    build:
+      context: ./modelapi
+      dockerfile: Dockerfile
+    container_name: modelapi-app
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./modelapi:/modelapi
+    command: uvicorn main:app --host 0.0.0.0 --port 9000 --reload

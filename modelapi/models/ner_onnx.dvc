@@ -1,0 +1,6 @@
+outs:
+- md5: 3bd8672d13d8bd6096ae4c4d75239c9c.dir
+  size: 456115659
+  nfiles: 6
+  hash: md5
+  path: ner_onnx

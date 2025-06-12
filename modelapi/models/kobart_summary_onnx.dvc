@@ -1,0 +1,6 @@
+outs:
+- md5: 087abb7f63613ab72a6e37490d6f46c4.dir
+  size: 1068233135
+  nfiles: 8
+  hash: md5
+  path: kobart_summary_onnx

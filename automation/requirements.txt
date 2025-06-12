@@ -5,14 +5,8 @@ schedule
 sqlalchemy
 psycopg2-binary
 kss
-konlpy
 joblib
 numpy
 pandas
-chardet
-scikit-learn
-onnxruntime
-onnx
-tokenizers
 redis
 pykrx
