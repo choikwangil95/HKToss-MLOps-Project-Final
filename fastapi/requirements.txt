@@ -1,6 +1,7 @@
 # Web server & routing
 fastapi
 uvicorn
+gunicorn
 
 # Data processing & transformation
 numpy
