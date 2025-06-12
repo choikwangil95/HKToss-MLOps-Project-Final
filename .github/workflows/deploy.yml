@@ -73,9 +73,9 @@ jobs:
             dvc pull
 
             echo "🐳 Re-deploying container (production mode)..."
-            docker-compose -f docker-compose.prod.yml down
-            docker-compose -f docker-compose.prod.yml pull || true
-            docker-compose -f docker-compose.prod.yml up -d
+            docker-compose -f docker-compose.prod.yaml down
+            docker-compose -f docker-compose.prod.yaml pull || true
+            docker-compose -f docker-compose.prod.yaml up -d
 
             echo "🚀 Deployment finished!"
         env:
