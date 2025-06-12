@@ -63,18 +63,18 @@ class NewsModel_v2_External(Base):
     )
 
     # D-14
-    d_minus_14_date_close = Column(Float)
-    d_minus_14_date_volume = Column(Float)
-    d_minus_14_date_foreign = Column(Float)
-    d_minus_14_date_institution = Column(Float)
-    d_minus_14_date_individual = Column(Float)
+    d_minus_5_date_close = Column(Float)
+    d_minus_5_date_volume = Column(Float)
+    d_minus_5_date_foreign = Column(Float)
+    d_minus_5_date_institution = Column(Float)
+    d_minus_5_date_individual = Column(Float)
 
     # D-7
-    d_minus_7_date_close = Column(Float)
-    d_minus_7_date_volume = Column(Float)
-    d_minus_7_date_foreign = Column(Float)
-    d_minus_7_date_institution = Column(Float)
-    d_minus_7_date_individual = Column(Float)
+    d_minus_4_date_close = Column(Float)
+    d_minus_4_date_volume = Column(Float)
+    d_minus_4_date_foreign = Column(Float)
+    d_minus_4_date_institution = Column(Float)
+    d_minus_4_date_individual = Column(Float)
 
     # D-3
     d_minus_3_date_close = Column(Float)
@@ -97,52 +97,12 @@ class NewsModel_v2_External(Base):
     d_minus_1_date_institution = Column(Float)
     d_minus_1_date_individual = Column(Float)
 
-    # D-day
-    d_day_date_close = Column(Float)
-    d_day_date_volume = Column(Float)
-    d_day_date_foreign = Column(Float)
-    d_day_date_institution = Column(Float)
-    d_day_date_individual = Column(Float)
-
-    # D+1
+    # D+1 ~ D+5
     d_plus_1_date_close = Column(Float)
-    d_plus_1_date_volume = Column(Float)
-    d_plus_1_date_foreign = Column(Float)
-    d_plus_1_date_institution = Column(Float)
-    d_plus_1_date_individual = Column(Float)
-
-    # D+2
     d_plus_2_date_close = Column(Float)
-    d_plus_2_date_volume = Column(Float)
-    d_plus_2_date_foreign = Column(Float)
-    d_plus_2_date_institution = Column(Float)
-    d_plus_2_date_individual = Column(Float)
-
-    # D+3
     d_plus_3_date_close = Column(Float)
-    d_plus_3_date_volume = Column(Float)
-    d_plus_3_date_foreign = Column(Float)
-    d_plus_3_date_institution = Column(Float)
-    d_plus_3_date_individual = Column(Float)
-
-    # D+7
-    d_plus_7_date_close = Column(Float)
-    d_plus_7_date_volume = Column(Float)
-    d_plus_7_date_foreign = Column(Float)
-    d_plus_7_date_institution = Column(Float)
-    d_plus_7_date_individual = Column(Float)
-
-    # D+14
-    d_plus_14_date_close = Column(Float)
-    d_plus_14_date_volume = Column(Float)
-    d_plus_14_date_foreign = Column(Float)
-    d_plus_14_date_institution = Column(Float)
-    d_plus_14_date_individual = Column(Float)
-
-    # 기타 정보
-    d_day_date_open = Column(Float)
-    d_day_change_open = Column(Float)
-    d_day_change = Column(Float)
+    d_plus_4_date_close = Column(Float)
+    d_plus_5_date_close = Column(Float)
 
     fx = Column(Float)
     bond10y = Column(Float)

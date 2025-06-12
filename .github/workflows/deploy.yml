@@ -72,10 +72,10 @@ jobs:
             echo "📦 DVC 파일 다운로드..."
             dvc pull
 
-            echo "🐳 Re-deploying container..."
-            docker-compose down
-            docker-compose pull || true
-            docker-compose up -d --build
+            echo "🐳 Re-deploying container (production mode)..."
+            docker-compose -f docker-compose.prod.yml down
+            docker-compose -f docker-compose.prod.yml pull || true
+            docker-compose -f docker-compose.prod.yml up -d
 
             echo "🚀 Deployment finished!"
         env:

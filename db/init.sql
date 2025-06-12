@@ -71,17 +71,17 @@ END $$;
 CREATE TABLE news_v2_external (
   news_id VARCHAR PRIMARY KEY,
 
-  d_minus_14_date_close FLOAT,
-  d_minus_14_date_volume FLOAT,
-  d_minus_14_date_foreign FLOAT,
-  d_minus_14_date_institution FLOAT,
-  d_minus_14_date_individual FLOAT,
+  d_minus_5_date_close FLOAT,
+  d_minus_5_date_volume FLOAT,
+  d_minus_5_date_foreign FLOAT,
+  d_minus_5_date_institution FLOAT,
+  d_minus_5_date_individual FLOAT,
 
-  d_minus_7_date_close FLOAT,
-  d_minus_7_date_volume FLOAT,
-  d_minus_7_date_foreign FLOAT,
-  d_minus_7_date_institution FLOAT,
-  d_minus_7_date_individual FLOAT,
+  d_minus_4_date_close FLOAT,
+  d_minus_4_date_volume FLOAT,
+  d_minus_4_date_foreign FLOAT,
+  d_minus_4_date_institution FLOAT,
+  d_minus_4_date_individual FLOAT,
 
   d_minus_3_date_close FLOAT,
   d_minus_3_date_volume FLOAT,
@@ -101,45 +101,11 @@ CREATE TABLE news_v2_external (
   d_minus_1_date_institution FLOAT,
   d_minus_1_date_individual FLOAT,
 
-  d_day_date_close FLOAT,
-  d_day_date_volume FLOAT,
-  d_day_date_foreign FLOAT,
-  d_day_date_institution FLOAT,
-  d_day_date_individual FLOAT,
-
   d_plus_1_date_close FLOAT,
-  d_plus_1_date_volume FLOAT,
-  d_plus_1_date_foreign FLOAT,
-  d_plus_1_date_institution FLOAT,
-  d_plus_1_date_individual FLOAT,
-
   d_plus_2_date_close FLOAT,
-  d_plus_2_date_volume FLOAT,
-  d_plus_2_date_foreign FLOAT,
-  d_plus_2_date_institution FLOAT,
-  d_plus_2_date_individual FLOAT,
-
   d_plus_3_date_close FLOAT,
-  d_plus_3_date_volume FLOAT,
-  d_plus_3_date_foreign FLOAT,
-  d_plus_3_date_institution FLOAT,
-  d_plus_3_date_individual FLOAT,
-
-  d_plus_7_date_close FLOAT,
-  d_plus_7_date_volume FLOAT,
-  d_plus_7_date_foreign FLOAT,
-  d_plus_7_date_institution FLOAT,
-  d_plus_7_date_individual FLOAT,
-
-  d_plus_14_date_close FLOAT,
-  d_plus_14_date_volume FLOAT,
-  d_plus_14_date_foreign FLOAT,
-  d_plus_14_date_institution FLOAT,
-  d_plus_14_date_individual FLOAT,
-
-  d_day_date_open FLOAT,
-  d_day_change_open FLOAT,
-  d_day_change FLOAT,
+  d_plus_4_date_close FLOAT,
+  d_plus_5_date_close FLOAT,
 
   fx FLOAT,
   bond10y FLOAT,
@@ -155,18 +121,12 @@ BEGIN
     IF (SELECT COUNT(*) FROM news_v2_external) = 0 THEN
         COPY news_v2_external (
             news_id,
-            d_minus_14_date_close, d_minus_14_date_volume, d_minus_14_date_foreign, d_minus_14_date_institution, d_minus_14_date_individual,
-            d_minus_7_date_close, d_minus_7_date_volume, d_minus_7_date_foreign, d_minus_7_date_institution, d_minus_7_date_individual,
+            d_minus_5_date_close, d_minus_5_date_volume, d_minus_5_date_foreign, d_minus_5_date_institution, d_minus_5_date_individual,
+            d_minus_4_date_close, d_minus_4_date_volume, d_minus_4_date_foreign, d_minus_4_date_institution, d_minus_4_date_individual,
             d_minus_3_date_close, d_minus_3_date_volume, d_minus_3_date_foreign, d_minus_3_date_institution, d_minus_3_date_individual,
             d_minus_2_date_close, d_minus_2_date_volume, d_minus_2_date_foreign, d_minus_2_date_institution, d_minus_2_date_individual,
             d_minus_1_date_close, d_minus_1_date_volume, d_minus_1_date_foreign, d_minus_1_date_institution, d_minus_1_date_individual,
-            d_day_date_close, d_day_date_volume, d_day_date_foreign, d_day_date_institution, d_day_date_individual,
-            d_plus_1_date_close, d_plus_1_date_volume, d_plus_1_date_foreign, d_plus_1_date_institution, d_plus_1_date_individual,
-            d_plus_2_date_close, d_plus_2_date_volume, d_plus_2_date_foreign, d_plus_2_date_institution, d_plus_2_date_individual,
-            d_plus_3_date_close, d_plus_3_date_volume, d_plus_3_date_foreign, d_plus_3_date_institution, d_plus_3_date_individual,
-            d_plus_7_date_close, d_plus_7_date_volume, d_plus_7_date_foreign, d_plus_7_date_institution, d_plus_7_date_individual,
-            d_plus_14_date_close, d_plus_14_date_volume, d_plus_14_date_foreign, d_plus_14_date_institution, d_plus_14_date_individual,
-            d_day_date_open, d_day_change_open, d_day_change,
+            d_plus_1_date_close, d_plus_2_date_close, d_plus_3_date_close, d_plus_4_date_close, d_plus_5_date_close,
             fx, bond10y, base_rate
         )
         FROM '/docker-entrypoint-initdb.d/news_2023_2025_external.csv'
@@ -190,11 +150,11 @@ CREATE TABLE IF NOT EXISTS reports (
     embedding VECTOR(768)
 );
 
-DO $$
-BEGIN
-    IF (SELECT COUNT(*) FROM reports) = 0 THEN
-        COPY reports(stock_name, title, sec_firm, date, view_count, url, target_price, opinion, report_content, embedding)
-        FROM '/docker-entrypoint-initdb.d/report_24_25_with_embeddings.csv'
-        WITH (FORMAT csv, HEADER true);
-    END IF;
-END $$;
+-- DO $$
+-- BEGIN
+--     IF (SELECT COUNT(*) FROM reports) = 0 THEN
+--        COPY reports(stock_name, title, sec_firm, date, view_count, url, target_price, opinion, report_content, embedding)
+--        FROM '/docker-entrypoint-initdb.d/report_24_25_with_embeddings.csv'
+--        WITH (FORMAT csv, HEADER true);
+--    END IF;
+-- END $$;
