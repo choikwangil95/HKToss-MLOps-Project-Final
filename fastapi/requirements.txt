@@ -1,6 +1,7 @@
 # Web server & routing
 fastapi
 uvicorn
+starlette
 
 # Data processing & transformation
 numpy
