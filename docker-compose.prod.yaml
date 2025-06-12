@@ -10,7 +10,7 @@ services:
       - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
     # volumes:
     #   - ./fastapi:/fastapi
-    command: gunicorn main:app -k uvicorn.workers.UvicornWorker --workers 4 --bind 0.0.0.0:8000
+    command: gunicorn main:app -k uvicorn.workers.UvicornWorker --workers 1 --bind 0.0.0.0:8000
 
   automation:
     build:
