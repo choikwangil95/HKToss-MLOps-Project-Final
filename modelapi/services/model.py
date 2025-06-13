@@ -16,6 +16,8 @@ def get_news_summary(
     decoder_sess = request.app.state.decoder_sess_summarize
     tokenizer = request.app.state.tokenizer_summarize
 
+    text = text.strip()[:300]
+
     input_ids = tokenizer.encode(text).ids
     input_ids_np = np.array([input_ids], dtype=np.int64)
     attention_mask = np.ones_like(input_ids_np, dtype=np.int64)

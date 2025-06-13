@@ -12,17 +12,19 @@ services:
     #   - ./fastapi:/fastapi
     command: gunicorn main:app -k uvicorn.workers.UvicornWorker --workers 4 --bind 0.0.0.0:8000
 
-  # automation:
-  #   build:
-  #     context: ./automation
-  #     dockerfile: Dockerfile
-  #   container_name: automation
-  #   depends_on:
-  #     - db
-  #   environment:
-  #     - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
-  #   volumes:
-  #     - ./automation:/automation
+  automation:
+    build:
+      context: ./automation
+      dockerfile: Dockerfile
+    container_name: automation
+    env_file:
+      - .env
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
+    volumes:
+      - ./automation:/automation
 
   db:
     image: ankane/pgvector
