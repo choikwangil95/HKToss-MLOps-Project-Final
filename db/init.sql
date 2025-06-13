@@ -158,3 +158,20 @@ CREATE TABLE IF NOT EXISTS reports (
 --        WITH (FORMAT csv, HEADER true);
 --    END IF;
 -- END $$;
+
+
+- news_v2_vector 테이블 생성 (news_id + embedding만 포함)
+CREATE TABLE IF NOT EXISTS news_v2_vector (
+news_id VARCHAR PRIMARY KEY,
+embedding VECTOR(768)
+);
+
+- news_v2_vector news_id만 COPY (embedding은 나중에 update 예정)
+DO $$
+BEGIN
+IF (SELECT COUNT(*) FROM news_v2_vector) = 0 THEN
+COPY news_v2_vector(news_id)
+FROM '/docker-entrypoint-initdb.d/news_2023_2025_metadata.csv'
+WITH (FORMAT csv, HEADER true);
+END IF;
+END $$;
