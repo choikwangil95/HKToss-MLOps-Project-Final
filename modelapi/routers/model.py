@@ -1,6 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request, Body
-from schemas.model import StockOut, SummaryOut, SummaryIn, StockIn
+from schemas.model import (
+    EmbeddingIn,
+    EmbeddingOut,
+    StockOut,
+    SummaryOut,
+    SummaryIn,
+    StockIn,
+)
 from services.model import (
+    get_news_embedding,
     get_news_summary,
     extract_ogg_economy,
     get_ner_tokens,
@@ -55,3 +63,30 @@ async def get_stock_list_router(request: Request, payload: StockIn):
     stock_list = extract_ogg_economy(tokens, labels)
 
     return {"stock_list": stock_list}
+
+
+@router.post(
+    "/embedding",
+    response_model=EmbeddingOut,
+    summary="뉴스 텍스트 임베딩",
+    description="뉴스 텍스트 임베딩",
+)
+async def get_news_embedding_router(request: Request, payload: EmbeddingIn):
+    """
+    뉴스 텍스트 임베딩
+    """
+    article = payload.article
+    if not article:
+        raise HTTPException(
+            status_code=400,
+            detail="기사 본문이 비어있습니다. 올바른 본문을 입력해주세요.",
+        )
+
+    embedding = get_news_embedding(article, request)
+    if embedding is None:
+        raise HTTPException(
+            status_code=500,
+            detail="임베딩 생성 중 오류가 발생했습니다. 다시 시도해주세요.",
+        )
+
+    return {"embedding": embedding}

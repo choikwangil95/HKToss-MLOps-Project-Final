@@ -26,3 +26,15 @@ def get_ner_tokenizer():
     session = ort.InferenceSession(str(base_path / "model.onnx"))
 
     return tokenizer, session
+
+
+def get_embedding_tokenizer():
+    """
+    ONNX NER 모델과 토크나이저 로딩
+    """
+    base_path = Path("models/kr_sbert_mean_onnx")
+
+    tokenizer = Tokenizer.from_file(str(base_path / "tokenizer.json"))
+    session = ort.InferenceSession(str(base_path / "kr_sbert.onnx"))
+
+    return tokenizer, session

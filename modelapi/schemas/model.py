@@ -23,3 +23,13 @@ class StockOut(BaseModel):
         default_factory=list,
         description="종목명 리스트",
     )
+
+
+class EmbeddingIn(BaseModel):
+    article: str
+
+
+class EmbeddingOut(BaseModel):
+    embedding: List[List[float]] = Field(
+        default_factory=list, description="(1, 768) 형식의 임베딩 벡터"
+    )

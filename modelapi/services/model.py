@@ -123,3 +123,26 @@ def extract_ogg_economy(tokens, labels, target_label="OGG_ECONOMY"):
     stock_list = merged_words.copy()
 
     return stock_list
+
+
+def get_news_embedding(text, request):
+    """
+    뉴스 본문을 임베딩하는 함수입니다.
+    """
+    tokenizer = request.app.state.tokenizer_embedding
+    session = request.app.state.session_embedding
+
+    # 입력 텍스트
+    text = "이 문장은 테스트입니다."
+    tokens = tokenizer.encode(text)
+    input_ids = np.array([tokens.ids], dtype=np.int64)
+    attention_mask = np.array([[1] * len(tokens.ids)], dtype=np.int64)
+
+    # 추론
+    embedding = session.run(
+        ["sentence_embedding"],
+        {"input_ids": input_ids, "attention_mask": attention_mask},
+    )[0]
+
+    # (1, 768) → List[List[float]]
+    return [[float(x) for x in embedding[0]]]
