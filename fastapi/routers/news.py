@@ -307,6 +307,9 @@ async def similar_news_v2(
     """
     try:
         result = find_news_similar_v2(db, news_id, top_n, min_gap_days, min_gap_between)
+        if result is None:
+            logger.warning(f"No similar news found for news_id={news_id}, returning empty list.")
+            return []
         return result
     except Exception as e:
         logger.exception(f"Error while finding similar news for news_id={news_id}")
