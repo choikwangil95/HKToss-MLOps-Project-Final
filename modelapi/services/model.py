@@ -133,7 +133,6 @@ def get_news_embedding(text, request):
     session = request.app.state.session_embedding
 
     # 입력 텍스트
-    text = "이 문장은 테스트입니다."
     tokens = tokenizer.encode(text)
     input_ids = np.array([tokens.ids], dtype=np.int64)
     attention_mask = np.array([[1] * len(tokens.ids)], dtype=np.int64)
