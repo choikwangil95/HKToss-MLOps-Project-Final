@@ -1,0 +1,5 @@
+outs:
+- md5: d833df265571e37cea6cf6572f43f5ca
+  size: 121610986
+  hash: md5
+  path: news_v2_vector_202506122113.csv
