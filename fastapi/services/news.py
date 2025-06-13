@@ -268,3 +268,79 @@ def find_stock_effected(db: Session, news_id: str):
     stocks = ast.literal_eval(stocks) if isinstance(stocks, str) else stocks
 
     return [{"news_id": news.news_id, "stocks": stocks}] if news.stocks else []
+
+
+########################### highlights ###############################
+
+# def get_top_news(db: Session, hours: int = 24, limit: int = 10) -> list[NewsModel_v2]:
+#     """24시간 내 상위 영향력 뉴스 조회"""
+#     time_threshold = datetime.utcnow() - timedelta(hours=hours)
+    
+#     return db.query(NewsModel_v2).filter(
+#         NewsModel_v2.impact_score != None,
+#         NewsModel_v2.created_at >= time_threshold
+#     ).order_by(
+#         NewsModel_v2.impact_score.desc()
+#     ).limit(limit).all()
+
+# def get_top_news_by_date(db, start_datetime, end_datetime, limit=10):
+#     return db.query(NewsModel_v2).filter(
+#         NewsModel_v2.impact_score != None,
+#         NewsModel_v2.created_at >= start_datetime,
+#         NewsModel_v2.created_at < end_datetime
+#     ).order_by(
+#         NewsModel_v2.impact_score.desc()
+#     ).limit(limit).all()
+
+
+def get_top_impact_news(
+    db: Session,
+    start_datetime: datetime,
+    end_datetime: datetime,
+    limit: int = 10
+) -> list[dict]:
+    """특정 기간 내 상위 impact_score 뉴스 조회"""
+    # 1. 날짜 범위 유효성 검증
+    if start_datetime >= end_datetime:
+        raise ValueError("시작일은 종료일보다 앞서야 합니다.")
+    
+    # 2. 조인 쿼리
+    results = (
+        db.query(
+            NewsModel_v2.news_id,
+            NewsModel_v2.wdate,
+            NewsModel_v2.title,
+            NewsModel_v2.image,
+            NewsModel_v2.press,
+            NewsModel_v2.url,
+            NewsModel_v2_Metadata.summary,
+            NewsModel_v2_Metadata.impact_score
+        )
+        .join(
+            NewsModel_v2_Metadata,
+            NewsModel_v2.news_id == NewsModel_v2_Metadata.news_id
+        )
+        .filter(
+            NewsModel_v2.wdate >= start_datetime,
+            NewsModel_v2.wdate < end_datetime,
+            NewsModel_v2_Metadata.impact_score.isnot(None)
+        )
+        .order_by(NewsModel_v2_Metadata.impact_score.desc())
+        .limit(limit)
+        .all()
+    )
+    
+    # 3. 딕셔너리 형태로 변환
+    return [
+        {
+            "news_id": row.news_id,
+            "wdate": row.wdate,
+            "title": row.title,
+            "image": row.image,
+            "press": row.press,
+            "summary": row.summary,
+            "impact_score": row.impact_score,
+            "url": row.url
+        }
+        for row in results
+    ]
