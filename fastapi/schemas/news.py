@@ -15,7 +15,7 @@ class News(BaseModel):
     stocks: Optional[str]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # stocks만 빼고
@@ -55,7 +55,7 @@ class News_v2(BaseModel):
     stocks: Optional[str]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class NewsOut_v2(BaseModel):
@@ -68,7 +68,7 @@ class NewsOut_v2(BaseModel):
     image: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class NewsOut_v2_Metadata(BaseModel):
@@ -79,7 +79,7 @@ class NewsOut_v2_Metadata(BaseModel):
     impact_score: Optional[float]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
     @field_validator("stock_list", "industry_list", mode="before")
     @classmethod
@@ -92,11 +92,6 @@ class NewsOut_v2_Metadata(BaseModel):
             except Exception:
                 return [v]
         return v
-
-
-from typing import Optional
-from pydantic import BaseModel
-
 
 class NewsOut_v2_External(BaseModel):
     news_id: str
@@ -163,8 +158,23 @@ class Report(BaseModel):
     similarity: Optional[float] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class PastReportsResponse(BaseModel):
     results: List[Report]
+
+
+class TopNewsResponse(BaseModel):
+    news_id: str
+    wdate: datetime  # 날짜+시간
+    title: str
+    image: str | None  # 이미지 URL (nullable)
+    press: str | None  # 언론사 (nullable)
+    summary: str
+    impact_score: float
+    url: Optional[str]
+
+    class Config:
+        from_attributes = True 
+

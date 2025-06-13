@@ -13,6 +13,7 @@ from schemas.news import (
     Report,
     NewsStock,
     PastReportsResponse,
+    TopNewsResponse
 )
 from services.news import (
     get_news_detail_v2_external,
@@ -24,6 +25,7 @@ from services.news import (
     find_news_similar,
     get_similar_past_reports,
     find_stock_effected,
+    get_top_impact_news
 )
 from core.db import get_db
 from typing import List
@@ -211,20 +213,22 @@ async def list_news_v2(
 
 @router_v2.get(
     "/highlights",
-    response_model=list[NewsOut],
-    summary="[예정] 주요 뉴스 목록 조회",
-    description="주요 뉴스 기사를 조회합니다.",
-    include_in_schema=True,
+    response_model=list[TopNewsResponse],
+    summary="[완료] 주요 뉴스 목록 조회",
+    description="지정된 기간 동안 주요 뉴스 기사를 조회합니다.",
 )
-async def get_highlighted_news():
+async def get_top_impact_news_api(
+    start_datetime: datetime = Query(..., description="시작 일시 (예: 2025-05-15T00:00:00)"),
+    end_datetime: datetime = Query(..., description="종료 일시 (예: 2025-05-16T00:00:00)"),
+    limit: int = Query(10, description="반환 개수 (최대 100)", ge=1, le=100),
+    db: Session = Depends(get_db)
+):
     """
     주요 뉴스 목록을 조회합니다.
     """
-    return JSONResponse(
-        status_code=501,
-        content={"message": "주요 뉴스 목록 조회 API는 현재 준비 중입니다."},
-    )
-
+    news_list = get_top_impact_news(db, start_datetime, end_datetime, limit)
+    
+    return news_list
 
 @router_v2.get(
     "/{news_id}",
