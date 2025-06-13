@@ -41,3 +41,4 @@
 /news_2023_2025_raw.csv
 /impact_score_scaler.pkl
 /news_2023_2025_external.csv
+/news_id_only.csv
