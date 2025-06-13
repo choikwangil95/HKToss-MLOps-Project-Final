@@ -1,0 +1,5 @@
+outs:
+- md5: ece423c0139bcd725d01335106a0cdf7
+  size: 197226
+  hash: md5
+  path: news_id_only.csv
