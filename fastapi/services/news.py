@@ -399,6 +399,7 @@ def find_news_similar_v2(
         )[0][0]
 
         similarities.append((cand_news_id, cand_wdate, similarity_score))
+
     # 유사도 정렬 + 조건 적용
     similarities.sort(key=lambda x: x[2], reverse=True)
 
@@ -446,11 +447,11 @@ def find_news_similar_v2(
         SimilarNewsV2(
             news_id=row.news_id,
             wdate=row.wdate.isoformat(),
-            title=row.title,
-            press=row.press,
-            url=row.url,
-            image=row.image,
-            summary=row.summary,
+            title=row.title or "",          # None 방어 추가
+            press=row.press or "",          # None 방어 추가
+            url=row.url or "",              # None 방어 추가
+            image=row.image or "",          # None 방어 추가
+            summary=row.summary or "",      # None 방어 추가
             similarity=selected_similarities[row.news_id]
         )
         for row in rows
