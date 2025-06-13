@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from sqlalchemy import text
 from models.news import (
     NewsModel,
     NewsModel_v2,
@@ -7,12 +8,12 @@ from models.news import (
     NewsModel_v2_Metadata,
     ReportModel,
 )
-from schemas.news import News, NewsOut_v2_External
+from schemas.news import News, NewsOut_v2_External, SimilarNewsV2
 from datetime import timedelta
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 import numpy as np
-from typing import Optional
+from typing import Optional, List
 import datetime
 import json
 import ast
@@ -270,6 +271,7 @@ def find_stock_effected(db: Session, news_id: str):
     return [{"news_id": news.news_id, "stocks": stocks}] if news.stocks else []
 
 
+
 ########################### highlights ###############################
 
 # def get_top_news(db: Session, hours: int = 24, limit: int = 10) -> list[NewsModel_v2]:
@@ -344,3 +346,114 @@ def get_top_impact_news(
         }
         for row in results
     ]
+
+
+def find_news_similar_v2(
+    db: Session,
+    news_id: str,
+    top_n: int,
+    min_gap_days: int,
+    min_gap_between: int
+) -> List[SimilarNewsV2]:
+    # 기준 뉴스 임베딩 가져오기
+    ref_result = db.execute(
+        text("""
+        SELECT news_id, wdate, embedding
+        FROM news_v2_embedding
+        WHERE news_id = :news_id
+        """),
+        {"news_id": news_id}
+    ).fetchone()
+
+    if ref_result is None:
+        raise Exception(f"news_id {news_id} not found")
+
+    ref_news_id, ref_wdate, ref_embedding = ref_result
+    ref_embedding = np.array(json.loads(ref_embedding))
+
+    # 후보 embedding 가져오기
+    candidates = db.execute(
+        text("""
+        SELECT news_id, wdate, embedding
+        FROM news_v2_embedding
+        WHERE news_id != :news_id
+        AND wdate <= :ref_wdate - INTERVAL ':min_gap_days days'
+        AND embedding IS NOT NULL
+        """),
+        {
+            "news_id": news_id,
+            "ref_wdate": ref_wdate,
+            "min_gap_days": min_gap_days
+        },
+    ).fetchall()
+
+    # 유사도 계산
+    similarities = []
+    for row in candidates:
+        cand_news_id, cand_wdate, cand_embedding = row
+        cand_embedding = np.array(json.loads(cand_embedding))
+
+        similarity_score = cosine_similarity(
+            ref_embedding.reshape(1, -1), 
+            cand_embedding.reshape(1, -1)
+        )[0][0]
+
+        similarities.append((cand_news_id, cand_wdate, similarity_score))
+    # 유사도 정렬 + 조건 적용
+    similarities.sort(key=lambda x: x[2], reverse=True)
+
+    selected_news_ids = []
+    selected_dates = []
+    selected_similarities = {}
+
+    for cand_news_id, cand_wdate, similarity_score in similarities:
+        if all(abs((cand_wdate - d).days) >= min_gap_between for d in selected_dates):
+            selected_news_ids.append(cand_news_id)
+            selected_dates.append(cand_wdate)
+            selected_similarities[cand_news_id] = similarity_score
+
+        if len(selected_news_ids) >= top_n:
+            break
+
+    if not selected_news_ids:
+        return []
+
+    # 관련 정보 가져오기 (join 조회) → text() 추가!
+    rows = db.execute(
+        text("""
+        SELECT
+            v.news_id,
+            v.wdate,
+            n.title,
+            n.press,
+            n.url,
+            n.image,
+            m.summary
+        FROM
+            news_v2_embedding v
+        JOIN
+            news_v2 n ON v.news_id = n.news_id
+        JOIN
+            news_v2_metadata m ON v.news_id = m.news_id
+        WHERE
+            v.news_id IN :news_id_list
+        """),
+        {"news_id_list": tuple(selected_news_ids)}
+    ).fetchall()
+
+    # 최종 response 구성 → List[SimilarNewsV2]
+    related_news = [
+        SimilarNewsV2(
+            news_id=row.news_id,
+            wdate=row.wdate.isoformat(),
+            title=row.title,
+            press=row.press,
+            url=row.url,
+            image=row.image,
+            summary=row.summary,
+            similarity=selected_similarities[row.news_id]
+        )
+        for row in rows
+    ]
+
+    return related_news

@@ -160,18 +160,26 @@ CREATE TABLE IF NOT EXISTS reports (
 -- END $$;
 
 
-- news_v2_vector 테이블 생성 (news_id + embedding만 포함)
-CREATE TABLE IF NOT EXISTS news_v2_vector (
-news_id VARCHAR PRIMARY KEY,
-embedding VECTOR(768)
+-- news_v2_embedding 테이블 생성 (그대로 유지)
+CREATE TABLE IF NOT EXISTS news_v2_embedding (
+    news_id VARCHAR PRIMARY KEY,
+    wdate TIMESTAMP,
+    embedding VECTOR(768),
+    CONSTRAINT fk_news_id FOREIGN KEY (news_id) REFERENCES news_v2(news_id) ON DELETE CASCADE
 );
 
-- news_v2_vector news_id만 COPY (embedding은 나중에 update 예정)
-DO $$
-BEGIN
-IF (SELECT COUNT(*) FROM news_v2_vector) = 0 THEN
-COPY news_v2_vector(news_id)
-FROM '/docker-entrypoint-initdb.d/news_2023_2025_metadata.csv'
+-- news_id 먼저 COPY → news_2023_2025_metadata.csv 사용
+COPY news_v2_embedding(news_id)
+FROM '/docker-entrypoint-initdb.d/news_id_only.csv'
 WITH (FORMAT csv, HEADER true);
-END IF;
-END $$;
+
+-- wdate 업데이트
+UPDATE news_v2_embedding v
+SET wdate = n.wdate
+FROM news_v2 n
+WHERE v.news_id = n.news_id;
+
+-- embedding 업데이트 (Python에서 summary 임베딩 후)
+UPDATE news_v2_embedding
+SET embedding = '여기에 VECTOR 문자열'::VECTOR
+WHERE news_id = '특정 뉴스 ID';

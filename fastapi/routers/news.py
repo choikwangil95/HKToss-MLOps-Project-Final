@@ -13,7 +13,8 @@ from schemas.news import (
     Report,
     NewsStock,
     PastReportsResponse,
-    TopNewsResponse
+    TopNewsResponse,
+    SimilarNewsV2
 )
 from services.news import (
     get_news_detail_v2_external,
@@ -25,7 +26,8 @@ from services.news import (
     find_news_similar,
     get_similar_past_reports,
     find_stock_effected,
-    get_top_impact_news
+    get_top_impact_news,
+    find_news_similar_v2
 )
 from core.db import get_db
 from typing import List
@@ -279,3 +281,33 @@ async def news_detail_external(
     """
 
     return await run_in_threadpool(get_news_detail_v2_external, db, news_id)
+
+
+import logging
+logger = logging.getLogger(__name__)
+@router_v2.get(
+    "/{news_id}/related/news",
+    response_model=List[SimilarNewsV2],
+    summary="[v2] 뉴스 관련 과거 유사 뉴스 조회",
+    description="입력한 뉴스와 유사한 과거 뉴스를 조건에 따라 필터링하여 조회합니다.",
+)
+async def similar_news_v2(
+    news_id: str = Path(..., description="기준이 되는 뉴스 ID"),
+    top_n: int = Query(5, description="가장 유사한 뉴스 개수", ge=1, le=50),
+    min_gap_days: int = Query(
+        180, description="기준 뉴스와 유사 뉴스 간 최소 시간 간격 (일 단위)"
+    ),
+    min_gap_between: int = Query(
+        90, description="유사 뉴스 간 최소 시간 간격 (일 단위)"
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    [v2] 기준 뉴스와 유사한 과거 뉴스 목록을 반환합니다.
+    """
+    try:
+        result = find_news_similar_v2(db, news_id, top_n, min_gap_days, min_gap_between)
+        return result
+    except Exception as e:
+        logger.exception(f"Error while finding similar news for news_id={news_id}")
+        raise HTTPException(status_code=500, detail=str(e))
