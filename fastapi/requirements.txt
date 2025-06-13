@@ -1,6 +1,8 @@
 # Web server & routing
 fastapi
 uvicorn
+gunicorn
+starlette
 
 # Data processing & transformation
 numpy
@@ -26,5 +28,3 @@ dvc[s3]
 
 # DB 연결 및 ORM 라이브러리
 sqlalchemy>=1.4
-
-transformers

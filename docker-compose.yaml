@@ -14,17 +14,17 @@ services:
       - ./fastapi:/fastapi
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  #automation:
-  #  build:
-  #    context: ./automation
-  #    dockerfile: Dockerfile
-  #  container_name: automation
-  #  depends_on:
-  #    - db
-  #  environment:
-  #    - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
-  #  volumes:
-  #    - ./automation:/automation
+  automation:
+   build:
+     context: ./automation
+     dockerfile: Dockerfile
+   container_name: automation
+   depends_on:
+     - db
+   environment:
+     - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
+   volumes:
+     - ./automation:/automation
 
   db:
     image: ankane/pgvector

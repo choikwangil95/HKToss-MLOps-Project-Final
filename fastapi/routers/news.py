@@ -31,6 +31,7 @@ import json
 from typing import Optional
 import numpy as np
 from models.news import NewsModel, NewsModel_v2
+from starlette.concurrency import run_in_threadpool
 
 
 router = APIRouter(
@@ -44,7 +45,7 @@ router = APIRouter(
     summary="[완료] 뉴스 목록 조회",
     description="최신 뉴스 기사를 페이지 단위로 조회합니다.",
 )
-def list_news(
+async def list_news(
     skip: int = Query(0, description="건너뛸 뉴스 개수 (페이지네이션용)", ge=0),
     limit: int = Query(20, description="가져올 뉴스 개수", le=100),
     title: Optional[str] = Query(
@@ -63,7 +64,8 @@ def list_news(
     - `start_date`: 조회 시작 날짜 (형식: YYYY-MM-DD)
     - `end_date`: 조회 종료 날짜 (형식: YYYY-MM-DD)
     """
-    return get_news_list(
+    return await run_in_threadpool(
+        get_news_list,
         db,
         skip=skip,
         limit=limit,
@@ -79,14 +81,14 @@ def list_news(
     summary="[완료] 뉴스 상세 조회",
     description="뉴스 ID를 기반으로 해당 뉴스 기사의 상세 정보를 조회합니다.",
 )
-def news_detail(
+async def news_detail(
     news_id: str = Path(..., description="뉴스 고유 ID"),
     db: Session = Depends(get_db),
 ):
     """
     특정 뉴스의 상세 정보를 조회합니다.
     """
-    return get_news_detail(db, news_id)
+    return await run_in_threadpool(get_news_detail, db, news_id)
 
 
 @router.get(
@@ -95,7 +97,7 @@ def news_detail(
     summary="[완료] 뉴스 관련 과거 유사 뉴스 조회",
     description="입력한 뉴스와 유사한 과거 뉴스를 조건에 따라 필터링하여 조회합니다.",
 )
-def similar_news(
+async def similar_news(
     news_id: str = Path(..., description="기준이 되는 뉴스 ID"),
     top_n: int = Query(5, description="가장 유사한 뉴스 개수", ge=1, le=50),
     min_gap_days: int = Query(
@@ -113,7 +115,9 @@ def similar_news(
     - 기준 뉴스와 최소 `{min_gap_days}`일 이상 떨어져 있어야 함
     - 유사 뉴스끼리는 `{min_gap_between}`일 이상 떨어져 있어야 함
     """
-    return find_news_similar(db, news_id, top_n, min_gap_days, min_gap_between)
+    return await run_in_threadpool(
+        find_news_similar, db, news_id, top_n, min_gap_days, min_gap_between
+    )
 
 
 @router.get(
@@ -143,6 +147,7 @@ def matched_reports(
     results = get_similar_past_reports(
         db, news_embedding, news.date, topk=topk, date_margin=90
     )
+
     return {"results": results}
 
 
@@ -152,14 +157,14 @@ def matched_reports(
     summary="[완료] 뉴스 관련 주식 종목 조회",
     description="특정 뉴스와 관련된 주식 종목을 조회합니다.",
 )
-def matched_stock(
+async def matched_stock(
     news_id: str = Path(..., description="뉴스 고유 ID"), db: Session = Depends(get_db)
 ):
     """
     특정 뉴스와 관련된 주식 종목을 조회합니다.
     """
 
-    return find_stock_effected(db, news_id)
+    return await run_in_threadpool(find_stock_effected, db, news_id)
 
 
 router_v2 = APIRouter(
@@ -173,7 +178,7 @@ router_v2 = APIRouter(
     summary="[완료] 뉴스 목록 조회",
     description="최신 뉴스 기사를 페이지 단위로 조회합니다.",
 )
-def list_news_v2(
+async def list_news_v2(
     skip: int = Query(0, description="건너뛸 뉴스 개수 (페이지네이션용)", ge=0),
     limit: int = Query(20, description="가져올 뉴스 개수", le=100),
     title: Optional[str] = Query(
@@ -193,7 +198,8 @@ def list_news_v2(
     - `start_date`: 조회 시작 시각 (ISO 8601, 예: 2025-05-01T00:00:00)
     - `end_date`: 조회 종료 시각 (ISO 8601, 예: 2025-05-31T23:59:59)
     """
-    return get_news_list_v2(
+    return await run_in_threadpool(
+        get_news_list_v2,
         db=db,
         skip=skip,
         limit=limit,
@@ -210,7 +216,7 @@ def list_news_v2(
     description="주요 뉴스 기사를 조회합니다.",
     include_in_schema=True,
 )
-def get_highlighted_news():
+async def get_highlighted_news():
     """
     주요 뉴스 목록을 조회합니다.
     """
@@ -226,14 +232,15 @@ def get_highlighted_news():
     summary="[완료] 뉴스 상세 조회",
     description="뉴스 ID를 기반으로 해당 뉴스 기사의 상세 정보를 조회합니다.",
 )
-def news_detail(
+async def news_detail(
     news_id: str = Path(..., description="뉴스 고유 ID"),
     db: Session = Depends(get_db),
 ):
     """
     특정 뉴스의 상세 정보를 조회합니다.
     """
-    return get_news_detail_v2(db, news_id)
+
+    return await run_in_threadpool(get_news_detail_v2, db, news_id)
 
 
 @router_v2.get(
@@ -242,14 +249,15 @@ def news_detail(
     summary="[완료] 뉴스 상세 메타데이터 조회",
     description="뉴스 ID를 기반으로 해당 뉴스 기사의 메타데이터 정보를 조회합니다.",
 )
-def news_detail_metadata(
+async def news_detail_metadata(
     news_id: str = Path(..., description="뉴스 고유 ID"),
     db: Session = Depends(get_db),
 ):
     """
     특정 뉴스 기사의 메타데이터 정보를 조회합니다.
     """
-    return get_news_detail_v2_metadata(db, news_id)
+
+    return await run_in_threadpool(get_news_detail_v2_metadata, db, news_id)
 
 
 @router_v2.get(
@@ -258,11 +266,12 @@ def news_detail_metadata(
     summary="[완료] 뉴스 상세 외부 변수 (주가, 거래량, 금리 추이) 조회",
     description="뉴스 ID를 기반으로 해당 뉴스 기사의 외부 변수 (주가, 거래량, 금리 추이) 정보를 조회합니다.",
 )
-def news_detail_metadata(
+async def news_detail_external(
     news_id: str = Path(..., description="뉴스 고유 ID"),
     db: Session = Depends(get_db),
 ):
     """
     특정 뉴스 기사의 외부 변수 (주가, 거래량, 금리 추이) 정보를 조회합니다.
     """
-    return get_news_detail_v2_external(db, news_id)
+
+    return await run_in_threadpool(get_news_detail_v2_external, db, news_id)
