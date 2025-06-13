@@ -178,3 +178,16 @@ class TopNewsResponse(BaseModel):
     class Config:
         from_attributes = True 
 
+class SimilarNewsV2(BaseModel):
+    news_id: str
+    wdate: str  # ISO format으로 주기 위해 str 처리
+    title: str
+    press: str
+    url: str
+    image: str
+    summary: str
+    similarity: float
+
+    class Config:
+        orm_mode = True
+        
