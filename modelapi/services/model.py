@@ -145,3 +145,29 @@ def get_news_embedding(text, request):
 
     # (1, 768) → List[List[float]]
     return [[float(x) for x in embedding[0]]]
+
+
+def get_news_similar_list(payload, request):
+    """
+    유사 뉴스 top_k
+    """
+    article = payload.article
+    top_k = payload.top_k
+
+    vectordb = request.app.state.vectordb
+
+    # 검색
+    results = vectordb.similarity_search_with_score(article, k=top_k)
+
+    news_similar_list = [
+        {
+            "news_id": doc.metadata["news_id"],
+            "summary": doc.page_content,
+            "wdate": doc.metadata["wdate"],
+            "score": float(score),
+        }
+        for doc, score in results
+    ]
+
+    # (1, 768) → List[List[float]]
+    return news_similar_list

@@ -1,6 +1,11 @@
 from fastapi import FastAPI
 from routers import status, model
-from load_models import get_embedding_tokenizer, get_summarize_model, get_ner_tokenizer
+from load_models import (
+    get_embedding_tokenizer,
+    get_summarize_model,
+    get_ner_tokenizer,
+    get_vectordb,
+)
 
 app = FastAPI(title="MLOps Model API Server", version="0.0.0")
 
@@ -33,6 +38,13 @@ async def startup_event():
     app.state.session_embedding = session_embedding
 
     print("🟢 embedding 모델 로딩 완료")
+
+    print("🟡 vectordb 불러오는 중...")
+
+    vectordb = get_vectordb()
+    app.state.vectordb = vectordb
+
+    print("🟢 vectordb 모델 로딩 완료")
 
 
 # 라우터

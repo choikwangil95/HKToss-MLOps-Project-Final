@@ -1,0 +1,6 @@
+outs:
+- md5: bc881d0c51c3712b18521bab53563303.dir
+  size: 92047364
+  nfiles: 6
+  hash: md5
+  path: chroma_store

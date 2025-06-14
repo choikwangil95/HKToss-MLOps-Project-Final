@@ -14,7 +14,7 @@ from schemas.news import (
     NewsStock,
     PastReportsResponse,
     TopNewsResponse,
-    SimilarNewsV2
+    SimilarNewsV2,
 )
 from services.news import (
     get_news_detail_v2_external,
@@ -27,7 +27,7 @@ from services.news import (
     get_similar_past_reports,
     find_stock_effected,
     get_top_impact_news,
-    find_news_similar_v2
+    find_news_similar_v2,
 )
 from core.db import get_db
 from typing import List
@@ -220,17 +220,22 @@ async def list_news_v2(
     description="지정된 기간 동안 주요 뉴스 기사를 조회합니다.",
 )
 async def get_top_impact_news_api(
-    start_datetime: datetime = Query(..., description="시작 일시 (예: 2025-05-15T00:00:00)"),
-    end_datetime: datetime = Query(..., description="종료 일시 (예: 2025-05-16T00:00:00)"),
+    start_datetime: datetime = Query(
+        ..., description="시작 일시 (예: 2025-05-15T00:00:00)"
+    ),
+    end_datetime: datetime = Query(
+        ..., description="종료 일시 (예: 2025-05-16T00:00:00)"
+    ),
     limit: int = Query(10, description="반환 개수 (최대 100)", ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     주요 뉴스 목록을 조회합니다.
     """
     news_list = get_top_impact_news(db, start_datetime, end_datetime, limit)
-    
+
     return news_list
+
 
 @router_v2.get(
     "/{news_id}",
@@ -283,12 +288,10 @@ async def news_detail_external(
     return await run_in_threadpool(get_news_detail_v2_external, db, news_id)
 
 
-import logging
-logger = logging.getLogger(__name__)
 @router_v2.get(
     "/{news_id}/related/news",
     response_model=List[SimilarNewsV2],
-    summary="[v2] 뉴스 관련 과거 유사 뉴스 조회",
+    summary="뉴스 관련 과거 유사 뉴스 조회",
     description="입력한 뉴스와 유사한 과거 뉴스를 조건에 따라 필터링하여 조회합니다.",
 )
 async def similar_news_v2(
@@ -303,14 +306,14 @@ async def similar_news_v2(
     db: Session = Depends(get_db),
 ):
     """
-    [v2] 기준 뉴스와 유사한 과거 뉴스 목록을 반환합니다.
+    기준 뉴스와 유사한 과거 뉴스 목록을 반환합니다.
     """
     try:
-        result = find_news_similar_v2(db, news_id, top_n, min_gap_days, min_gap_between)
+        result = await run_in_threadpool(
+            find_news_similar_v2, db, news_id, top_n, min_gap_days, min_gap_between
+        )
         if result is None:
-            logger.warning(f"No similar news found for news_id={news_id}, returning empty list.")
             return []
         return result
     except Exception as e:
-        logger.exception(f"Error while finding similar news for news_id={news_id}")
         raise HTTPException(status_code=500, detail=str(e))
