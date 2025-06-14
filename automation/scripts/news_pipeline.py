@@ -705,13 +705,14 @@ def load_rate_df(rate_path):
 
 # 종목 리스트를 업종 리스트로 변환
 def get_industry_list_from_stocks(stock_list, stock_to_industry):
-    if len(stock_list) > 4 or len(stock_list) < 1:
+    # 조건: 종목 수가 1~4개가 아닐 경우 빈 리스트 반환
+    if not (1 <= len(stock_list) <= 4):
         return []
 
     return [
-        stock_to_industry.get(stock, "")
+        stock_to_industry.get(stock["stock_id"], "")
         for stock in stock_list
-        if stock_to_industry.get(stock, "") != ""
+        if stock_to_industry.get(stock["stock_id"], "") != ""
     ]
 
 
