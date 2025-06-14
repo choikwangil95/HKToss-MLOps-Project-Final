@@ -38,7 +38,7 @@ class EmbeddingOut(BaseModel):
 
 class SimilarNewsIn(BaseModel):
     article: str
-    top_k: int = Query(5, description="가장 유사한 뉴스 개수", ge=1, le=20)
+    top_k: int = Query(5, description="가장 유사한 뉴스 개수", ge=1, le=100)
 
 
 class SimilarNewsItem(BaseModel):
