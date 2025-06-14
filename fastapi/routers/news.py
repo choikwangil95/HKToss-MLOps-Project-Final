@@ -230,12 +230,13 @@ async def get_top_impact_news_api(
         ..., description="종료 일시 (예: 2025-05-16T00:00:00)"
     ),
     limit: int = Query(10, description="반환 개수 (최대 100)", ge=1, le=100),
+    stock_list: Optional[List[str]] = Depends(parse_comma_separated_stock_list),
     db: Session = Depends(get_db),
 ):
     """
     주요 뉴스 목록을 조회합니다.
     """
-    news_list = get_top_impact_news(db, start_datetime, end_datetime, limit)
+    news_list = get_top_impact_news(db, start_datetime, end_datetime, limit, stock_list)
 
     return news_list
 

@@ -311,7 +311,11 @@ def find_stock_effected(db: Session, news_id: str):
 
 
 def get_top_impact_news(
-    db: Session, start_datetime: datetime, end_datetime: datetime, limit: int = 10
+    db: Session,
+    start_datetime: datetime,
+    end_datetime: datetime,
+    limit: int = 10,
+    stock_list: Optional[List[str]] = None,
 ) -> list[dict]:
     """특정 기간 내 상위 impact_score 뉴스 조회"""
     # 1. 날짜 범위 유효성 검증
@@ -341,6 +345,22 @@ def get_top_impact_news(
         .order_by(NewsModel_v2_Metadata.impact_score.desc())
         .limit(limit)
         .all()
+    )
+
+    # 종목 필터링 (JSONB contains 방식)
+    if stock_list:
+        stock_conditions = [
+            cast(NewsModel_v2_Metadata.stock_list, JSONB).contains(
+                [{"stock_id": stock_id}]
+            )
+            for stock_id in stock_list
+        ]
+        if stock_conditions:
+            query = query.filter(or_(*stock_conditions))
+
+    # 정렬 및 결과 추출
+    results = (
+        query.order_by(NewsModel_v2_Metadata.impact_score.desc()).limit(limit).all()
     )
 
     # 3. 딕셔너리 형태로 변환
