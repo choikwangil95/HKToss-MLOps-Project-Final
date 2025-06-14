@@ -164,7 +164,7 @@ def get_news_similar_list(payload, request):
             "news_id": doc.metadata["news_id"],
             "summary": doc.page_content,
             "wdate": doc.metadata["wdate"],
-            "score": float(1 - score),
+            "score": 1 - float(score),
         }
         for doc, score in results
     ]
