@@ -1,4 +1,4 @@
-FROM python:3.10
+FROM python:3.10-slim
 
 # 필수 시스템 패키지 설치 (특히 psycopg2에 필요)
 RUN apt-get update && apt-get install -y \
