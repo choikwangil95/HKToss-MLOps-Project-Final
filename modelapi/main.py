@@ -7,7 +7,7 @@ from load_models import (
     get_ner_tokenizer,
     get_vectordb,
 )
-from .monitoring import instrumentator
+from monitoring import instrumentator
 
 app = FastAPI(title="MLOps Model API Server", version="0.0.0")
 
