@@ -1,6 +1,6 @@
 import numpy as np
 
-from modelapi.schemas.model import SimilarNewsItem
+from schemas.model import SimilarNewsItem
 
 
 def get_news_summary(
