@@ -1,28 +1,32 @@
 FROM python:3.10-slim
 
-# 필수 시스템 패키지 설치 (특히 psycopg2에 필요)
-RUN apt-get update && apt-get install -y \
-    openjdk-11-jdk && \
-    apt-get clean \
+# 2. 시스템 패키지 설치 (OpenJDK는 default-jdk로 교체 권장)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    default-jdk \
     gcc \
     libpq-dev \
     build-essential \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-ENV PATH=$JAVA_HOME/bin:$PATH
+ENV PATH="${JAVA_HOME}/bin:$PATH"
 
-# 최신 pip 설치
+# 3. 최신 pip 설치
 RUN pip install --upgrade pip
 
-COPY requirements.txt requirements.txt 
+# 4. 의존성 먼저 복사 (캐시 최적화)
+COPY requirements.txt .
 
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
+# 5. 앱 코드 복사
 WORKDIR /modelapi
+COPY . .
 
-COPY . /modelapi
-
+# 6. 포트 오픈
 EXPOSE 80
 
+# 7. 실행 명령어
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80", "--reload"]
