@@ -3,6 +3,7 @@ from news_pipeline import (
     extract_industries,
     fetch_latest_news,
     get_article_summary,
+    get_lda_topic,
     get_stock_list,
     remove_market_related_sentences,
     load_official_stock_list,
@@ -12,6 +13,7 @@ from news_pipeline import (
     save_to_db_metadata,
     get_news_deduplicate_by_title,
     save_to_db,
+    save_to_db_topics,
     send_to_redis,
 )
 import schedule
@@ -122,20 +124,39 @@ def job(official_stock_set, stock_name_to_code, stock_to_industry, code_to_indus
 
     save_to_db_metadata(ner_news)
 
+    # ──────────────────────────────
+    # 3 뉴스 경제 및 행동 지표 피쳐 추가
+    # - 주가 D+1~D+30 변동률, 금리, 환율, 기관 매매동향, 유가 등
+    # ──────────────────────────────
 
-# ──────────────────────────────
-# 3 뉴스 경제 및 행동 지표 피쳐 추가
-# - 주가 D+1~D+30 변동률, 금리, 환율, 기관 매매동향, 유가 등
-# ──────────────────────────────
+    # 으악
 
-# 으악
+    # ──────────────────────────────
+    # 4 뉴스 시멘틱 피쳐 추가
+    # - topic별 분포값, 클러스터 동일 여부
+    # ──────────────────────────────
 
-# ──────────────────────────────
-# 4 뉴스 시멘틱 피쳐 추가
-# - topic별 분포값, 클러스터 동일 여부
-# ──────────────────────────────
+    topic_news = []
+    if len(ner_news) != 0:
+        for news in ner_news:
+            # stock_list
+            news_summary = news["summary"]
 
-# 으악
+            lda_topics = get_lda_topic(news_summary)
+
+            news["topic_1"] = lda_topics["topic_1"]
+            news["topic_2"] = lda_topics["topic_2"]
+            news["topic_3"] = lda_topics["topic_3"]
+            news["topic_4"] = lda_topics["topic_4"]
+            news["topic_5"] = lda_topics["topic_5"]
+            news["topic_6"] = lda_topics["topic_6"]
+            news["topic_7"] = lda_topics["topic_7"]
+            news["topic_8"] = lda_topics["topic_8"]
+            news["topic_9"] = lda_topics["topic_9"]
+
+            topic_news.append(news)
+
+    save_to_db_topics(topic_news)
 
 
 if __name__ == "__main__":
@@ -156,26 +177,13 @@ if __name__ == "__main__":
     stock_to_industry, code_to_industry = load_stock_to_industry_map(industry_map_path)
     log.info("🟢 KOSPI 데이터 로딩 완료")
 
-    # log.info("🟡 LDA 모델 불러오는 중...")
-    # lda_model_path = os.path.abspath(os.path.join(BASE_DIR, "../db/best_lda_model.pkl"))
-    # count_vectorizer_path = os.path.abspath(
-    #     os.path.join(BASE_DIR, "../db/count_vectorizer.pkl")
-    # )
-    # stopwords_path = os.path.abspath(os.path.join(BASE_DIR, "../db/stopwords-ko.txt"))
-
-    # vectorizer = joblib.load(count_vectorizer_path)
-    # lda_model = joblib.load(lda_model_path)
-    # with open(stopwords_path, "r", encoding="utf-8") as f:
-    #     stopwords = [word.strip() for word in f.readlines()]
-    # log.info("🟢 LDA 모델 로딩 완료")
-
     log.info("✅ run_scheduler.py 시작됨")
 
     # 첫 실행 즉시
     job(official_stock_set, stock_name_to_code, stock_to_industry, code_to_industry)
 
     # 이후 매 1분마다 실행
-    schedule.every(3).minutes.do(
+    schedule.every(1).minutes.do(
         lambda: job(
             official_stock_set, stock_name_to_code, stock_to_industry, code_to_industry
         )

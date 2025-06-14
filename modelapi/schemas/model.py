@@ -2,7 +2,7 @@ from fastapi import Query
 from pydantic import BaseModel, field_validator, Field
 from typing import Optional
 from datetime import datetime, date
-from typing import List, Union
+from typing import List, Union, Dict
 from pydantic import validator
 import ast
 
@@ -50,3 +50,11 @@ class SimilarNewsItem(BaseModel):
 
 class SimilarNewsOut(BaseModel):
     similar_news_list: List[SimilarNewsItem]
+
+
+class LdaTopicsIn(BaseModel):
+    article: str
+
+
+class LdaTopicsOut(BaseModel):
+    lda_topics: Dict[str, float]  # 예: {"topic1": 0.15, "topic2": 0.03, ...}

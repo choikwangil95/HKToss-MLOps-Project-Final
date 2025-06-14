@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request, Bod
 from schemas.model import (
     EmbeddingIn,
     EmbeddingOut,
+    LdaTopicsIn,
+    LdaTopicsOut,
     SimilarNewsIn,
     SimilarNewsOut,
     StockOut,
@@ -10,6 +12,7 @@ from schemas.model import (
     StockIn,
 )
 from services.model import (
+    get_lda_topic,
     get_news_embedding,
     get_news_similar_list,
     get_news_summary,
@@ -120,3 +123,25 @@ async def get_news_embedding_router(request: Request, payload: SimilarNewsIn):
         )
 
     return {"similar_news_list": similar_news_list}
+
+
+@router.post(
+    "/lda_topic",
+    response_model=LdaTopicsOut,
+    summary="뉴스 요약문 LDA topic",
+    description="뉴스 요약문 LDA topic",
+)
+async def get_news_summary_router(request: Request, payload: LdaTopicsIn):
+    """
+    뉴스 요약문 LDA topic
+    """
+    article = payload.article
+    if not article:
+        raise HTTPException(
+            status_code=400,
+            detail="기사 요약문이 비어있습니다. 올바른 본문을 입력해주세요.",
+        )
+
+    lda_topics = get_lda_topic(article, request)
+
+    return {"lda_topics": lda_topics}

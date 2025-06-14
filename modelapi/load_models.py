@@ -4,6 +4,7 @@ import onnxruntime as ort
 from langchain_chroma import Chroma
 from langchain.embeddings.base import Embeddings
 import numpy as np
+import joblib
 
 
 def get_summarize_model():
@@ -87,3 +88,20 @@ def get_vectordb():
     )
 
     return vectordb
+
+
+def get_lda_model():
+    """
+    LDA 모델과 토크나이저 로딩
+    """
+    model_base_path = Path("models")
+
+    count_vectorizer = joblib.load(str(model_base_path / "count_vectorizer.pkl"))
+    lda_model = joblib.load(str(model_base_path / "best_lda_model.pkl"))
+
+    db_base_path = Path("db")
+
+    with open(str(db_base_path / "stopwords-ko.txt"), "r", encoding="utf-8") as f:
+        stopwords = [word.strip() for word in f.readlines()]
+
+    return lda_model, count_vectorizer, stopwords

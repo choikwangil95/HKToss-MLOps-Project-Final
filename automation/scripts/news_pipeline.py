@@ -12,8 +12,6 @@ from kss import split_sentences
 import os
 import pandas as pd
 import re
-
-# from konlpy.tag import Okt
 import numpy as np
 import json
 import redis
@@ -269,8 +267,6 @@ def save_to_db_metadata(articles):
 		ON CONFLICT (news_id) DO NOTHING;
 		"""
 
-        print(f"==================={articles}===================")
-
         values = [
             (
                 article["news_id"],
@@ -297,6 +293,55 @@ def save_to_db_metadata(articles):
 
     except Exception as e:
         log.error(f"❌ Metadata DB 저장 중 오류 ({type(e).__name__}): {e}")
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+
+def save_to_db_topics(articles):
+    if not articles:
+        log.info("저장할 뉴스 없음")
+        return
+
+    try:
+        DB_URL = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db"
+        )
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor()
+
+        insert_query = """
+		INSERT INTO news_v2_topic (news_id, topic_1, topic_2, topic_3, topic_4, topic_5, topic_6, topic_7, topic_8, topic_9)
+		VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+		ON CONFLICT (news_id) DO NOTHING;
+		"""
+
+        values = [
+            (
+                article["news_id"],
+                article["topic_1"],
+                article["topic_2"],
+                article["topic_3"],
+                article["topic_4"],
+                article["topic_5"],
+                article["topic_6"],
+                article["topic_7"],
+                article["topic_8"],
+                article["topic_9"],
+            )
+            for article in articles
+        ]
+
+        execute_batch(cur, insert_query, values)
+        conn.commit()
+
+        log.info(f"🧾 Topic DB 저장 완료: {len(values)}건 저장")
+
+    except Exception as e:
+        log.error(f"❌ Topic DB 저장 중 오류 ({type(e).__name__}): {e}")
 
     finally:
         if cur:
@@ -508,6 +553,21 @@ def get_stock_list(text):
         response = requests.post(url, json=payload)
         response.raise_for_status()
         return response.json()["stock_list"]  # 혹은 API 응답 구조에 따라 조정
+    except Exception as e:
+        print(f"❌ 종목명 추출 실패: {e}")
+        return []
+
+
+def get_lda_topic(text):
+    # 🟡 토큰화 및 입력값 준비
+
+    url = "http://15.165.211.100:8000/models/lda_topics"
+    payload = {"article": text}
+
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()["lda_topics"]  # 혹은 API 응답 구조에 따라 조정
     except Exception as e:
         print(f"❌ 종목명 추출 실패: {e}")
         return []

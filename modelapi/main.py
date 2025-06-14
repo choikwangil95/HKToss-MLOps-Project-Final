@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from routers import status, model
 from load_models import (
     get_embedding_tokenizer,
+    get_lda_model,
     get_summarize_model,
     get_ner_tokenizer,
     get_vectordb,
@@ -45,6 +46,15 @@ async def startup_event():
     app.state.vectordb = vectordb
 
     print("🟢 vectordb 모델 로딩 완료")
+
+    print("🟡 LDA 불러오는 중...")
+
+    lda_model, count_vectorizer, stopwords = get_lda_model()
+    app.state.lda_model = lda_model
+    app.state.count_vectorizer = count_vectorizer
+    app.state.stopwords = stopwords
+
+    print("🟢 LDA 모델 로딩 완료")
 
 
 # 라우터

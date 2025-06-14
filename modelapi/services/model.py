@@ -1,4 +1,7 @@
 import numpy as np
+import re
+from konlpy.tag import Okt
+import numpy as np
 
 from schemas.model import SimilarNewsItem
 
@@ -180,3 +183,40 @@ def get_news_similar_list(payload, request):
         )
 
     return news_similar_list
+
+
+def get_lda_topic(text, request):
+    lda_model = request.app.state.lda_model
+    count_vectorizer = request.app.state.count_vectorizer
+    stopwords = request.app.state.stopwords
+
+    # 2. 형태소 분석기 및 불용어 로드
+    okt = Okt()
+
+    # 3. 텍스트 정제 함수
+    def clean_text(text):
+        text = re.sub(r"\[.*?\]|\(.*?\)", "", text)
+        text = re.sub(r"[^가-힣\s]", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
+
+    # 4. 명사 추출 함수
+    def extract_nouns(text):
+        nouns = okt.nouns(text)
+        nouns = [word for word in nouns if word not in stopwords and len(word) > 1]
+        return " ".join(nouns)
+
+    # 5. 데이터 전처리 (정제 + 명사 추출)
+    processed_texts = [extract_nouns(clean_text(text))]
+
+    # 6. 벡터라이즈 (DTM 생성)
+    new_dtm = count_vectorizer.transform(processed_texts)
+
+    # 7. LDA 토픽 분포 예측
+    topic_distribution = lda_model.transform(new_dtm)
+
+    lda_topics = {}
+    for index, value in enumerate(topic_distribution[0]):
+        lda_topics[f"topic {index}"] = value
+
+    return lda_topics

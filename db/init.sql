@@ -136,6 +136,31 @@ BEGIN
 END $$;
 
 
+-- news_v2 테이블 생성
+CREATE TABLE news_v2_topic (
+  news_id VARCHAR PRIMARY KEY,
+  topic_1 FLOAT
+  topic_2 FLOAT
+  topic_3 FLOAT
+  topic_4 FLOAT
+  topic_5 FLOAT
+  topic_6 FLOAT
+  topic_7 FLOAT
+  topic_8 FLOAT
+  topic_9 FLOAT
+);
+
+-- 테이블에 데이터가 없을 때만 CSV에서 데이터 COPY 수행
+DO $$
+BEGIN
+    IF (SELECT COUNT(*) FROM news_v2_topic) = 0 THEN
+        COPY news_v2_topic(news_id, topic_1, topic_2, topic_3, topic_4, topic_5, topic_6, topic_7, topic_8, topic_9)
+        FROM '/docker-entrypoint-initdb.d/news_2023_2025_tm.csv'
+        WITH (FORMAT csv, HEADER true);
+    END IF;
+END $$;
+
+
 -- reports 테이블 생성
 CREATE TABLE IF NOT EXISTS reports (
     report_id SERIAL PRIMARY KEY,
