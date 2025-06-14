@@ -72,15 +72,18 @@ def get_vectordb():
         def embed_query(self, text: str) -> list[float]:
             return self._embed(text)
 
-    base_path = Path("models/kr_sbert_mean_onnx")
+    model_base_path = Path("models")
 
     embedding = OnnxEmbedder(
-        model_path=str(base_path / "kr_sbert.onnx"),
-        tokenizer_path=str(base_path / "tokenizer.json"),
+        model_path=str(model_base_path / "kr_sbert_mean_onnx/kr_sbert.onnx"),
+        tokenizer_path=str(model_base_path / "kr_sbert_mean_onnx/tokenizer.json"),
     )
 
+    db_base_path = Path("db")
+
     vectordb = Chroma(
-        persist_directory=str(base_path / "chroma_store"), embedding_function=embedding
+        persist_directory=str(db_base_path / "chroma_store"),
+        embedding_function=embedding,
     )
 
     return vectordb
