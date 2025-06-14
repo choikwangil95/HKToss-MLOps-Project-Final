@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import status, model
+from routers import status, model, custom
 from load_models import (
     get_embedding_tokenizer,
     get_lda_model,
@@ -7,8 +7,12 @@ from load_models import (
     get_ner_tokenizer,
     get_vectordb,
 )
+from .monitoring import instrumentator
 
 app = FastAPI(title="MLOps Model API Server", version="0.0.0")
+
+# 모니터링
+instrumentator.instrument(app).expose(app, include_in_schema=False, should_gzip=True)
 
 
 @app.on_event("startup")
@@ -59,4 +63,5 @@ async def startup_event():
 
 # 라우터
 app.include_router(status.router)  # 상태 확인 및 헬스 체크 라우터
-app.include_router(model.router)  # 상태 확인 및 헬스 체크 라우터
+app.include_router(model.router)
+app.include_router(custom.router)

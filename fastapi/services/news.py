@@ -400,7 +400,7 @@ def find_news_similar_v2(
     # 유사 뉴스 API 호출
     try:
         response = requests.post(
-            "http://15.165.211.100:8000/models/similar_news",
+            "http://15.165.211.100:8000/news/similar",
             json={"article": text, "top_k": 50},
         )
         response.raise_for_status()

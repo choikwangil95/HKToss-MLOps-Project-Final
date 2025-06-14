@@ -617,7 +617,7 @@ def remove_market_related_sentences(text: str) -> str:
 def get_article_summary(
     text,
 ):
-    url = "http://15.165.211.100:8000/models/summarize"  # 또는 EC2 내부/외부 주소
+    url = "http://15.165.211.100:8000/plm/summarize"  # 또는 EC2 내부/외부 주소
     payload = {"article": text}
 
     try:
@@ -636,7 +636,7 @@ def get_article_summary(
 def get_stock_list(text):
     # 🟡 토큰화 및 입력값 준비
 
-    url = "http://15.165.211.100:8000/models/stock_list"
+    url = "http://15.165.211.100:8000/plm/stocks"
     payload = {"article": text}
 
     try:
@@ -651,7 +651,7 @@ def get_stock_list(text):
 def get_lda_topic(text):
     # 🟡 토큰화 및 입력값 준비
 
-    url = "http://15.165.211.100:8000/models/lda_topics"
+    url = "http://15.165.211.100:8000/news/topics"
     payload = {"article": text}
 
     try:

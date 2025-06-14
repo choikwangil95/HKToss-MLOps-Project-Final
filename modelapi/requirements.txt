@@ -15,7 +15,8 @@ joblib
 pydantic
 
 # Monitoring & metrics
-# prometheus-fastapi-instrumentator
+prometheus-fastapi-instrumentator 
+prometheus-client
 
 # Database & ORM
 # sqlalchemy
