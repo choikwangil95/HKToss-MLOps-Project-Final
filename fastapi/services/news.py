@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, desc
+from sqlalchemy import or_, desc, cast
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import text
 from models.news import (
     NewsModel,
@@ -62,9 +63,12 @@ def get_news_list_v2(
     if end_datetime:
         query = query.filter(NewsModel_v2.wdate <= end_datetime)
 
+    # 종목 필터링 - JSONB contains 사용
     if stock_list:
         stock_conditions = [
-            NewsModel_v2_Metadata.stock_list.contains([{"stock_id": stock_id}])
+            cast(NewsModel_v2_Metadata.stock_list, JSONB).contains(
+                [{"stock_id": stock_id}]
+            )
             for stock_id in stock_list
         ]
         if stock_conditions:
