@@ -32,3 +32,8 @@ scikit-learn
 onnxruntime
 onnx
 tokenizers
+
+
+chromadb
+langchain
+langchain-community

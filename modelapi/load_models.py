@@ -1,6 +1,9 @@
 from tokenizers import Tokenizer
 from pathlib import Path
 import onnxruntime as ort
+from langchain.vectorstores import Chroma
+from langchain.embeddings.base import Embeddings
+import numpy as np
 
 
 def get_summarize_model():
@@ -38,3 +41,46 @@ def get_embedding_tokenizer():
     session = ort.InferenceSession(str(base_path / "kr_sbert.onnx"))
 
     return tokenizer, session
+
+
+def get_vectordb():
+    """
+    vectordb 로딩
+    """
+
+    class OnnxEmbedder(Embeddings):
+        def __init__(self, model_path: str, tokenizer_path: str):
+            self.session = ort.InferenceSession(model_path)
+            self.tokenizer = Tokenizer.from_file(tokenizer_path)
+
+        def _embed(self, text: str):
+            encoding = self.tokenizer.encode(text)
+            input_ids = np.array([encoding.ids], dtype=np.int64)
+            attention_mask = np.array([[1] * len(encoding.ids)], dtype=np.int64)
+
+            outputs = self.session.run(
+                None, {"input_ids": input_ids, "attention_mask": attention_mask}
+            )
+
+            raw_vector = outputs[0][0]
+            norm_vector = raw_vector / (np.linalg.norm(raw_vector) + 1e-10)
+            return norm_vector.tolist()
+
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            return [self._embed(text) for text in texts]
+
+        def embed_query(self, text: str) -> list[float]:
+            return self._embed(text)
+
+    base_path = Path("models/kr_sbert_mean_onnx")
+
+    embedding = OnnxEmbedder(
+        model_path=str(base_path / "kr_sbert.onnx"),
+        tokenizer_path=str(base_path / "tokenizer.json"),
+    )
+
+    vectordb = Chroma(
+        persist_directory=str(base_path / "chroma_store"), embedding_function=embedding
+    )
+
+    return vectordb

@@ -93,6 +93,7 @@ class NewsOut_v2_Metadata(BaseModel):
                 return [v]
         return v
 
+
 class NewsOut_v2_External(BaseModel):
     news_id: str
 
@@ -176,7 +177,8 @@ class TopNewsResponse(BaseModel):
     url: Optional[str]
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
 
 class SimilarNewsV2(BaseModel):
     news_id: str
@@ -190,4 +192,3 @@ class SimilarNewsV2(BaseModel):
 
     class Config:
         orm_mode = True
-        

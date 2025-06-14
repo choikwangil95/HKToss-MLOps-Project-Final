@@ -33,3 +33,22 @@ class EmbeddingOut(BaseModel):
     embedding: List[List[float]] = Field(
         default_factory=list, description="(1, 768) 형식의 임베딩 벡터"
     )
+
+
+class SimilarNewsIn(BaseModel):
+    article: str
+    top_k: int
+
+
+class SimilarNewsItem(BaseModel):
+    news_id: str
+    summary: str
+    wdate: str
+    score: float
+
+
+class SimilarNewsOut(BaseModel):
+    similar_news_list: List[SimilarNewsItem] = Field(
+        default_factory=list,
+        description="유사 뉴스 리스트",
+    )
