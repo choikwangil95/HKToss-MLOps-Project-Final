@@ -1,6 +1,7 @@
 # Web server & routing
 fastapi
 uvicorn
+gunicorn
 
 # Data processing & transformation
 numpy
@@ -37,3 +38,4 @@ tokenizers
 chromadb
 langchain
 langchain-community
+langchain-chroma

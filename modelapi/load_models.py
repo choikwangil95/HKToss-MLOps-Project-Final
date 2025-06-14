@@ -1,7 +1,7 @@
 from tokenizers import Tokenizer
 from pathlib import Path
 import onnxruntime as ort
-from langchain.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain.embeddings.base import Embeddings
 import numpy as np
 
