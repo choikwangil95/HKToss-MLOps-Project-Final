@@ -51,6 +51,7 @@ class NewsModel_v2_Metadata(Base):
     )
     summary = Column(Text)  # summary TEXT
     stock_list = Column(JSON)  # JSON으로 변경
+    stock_list_view = Column(JSON)  # JSON으로 변경
     industry_list = Column(JSON)
     impact_score = Column(Float)  # impact_score FLOAT, 영향 점수 (예: 0.75, 0.85 등)
 

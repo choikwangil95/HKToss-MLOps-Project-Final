@@ -1,7 +1,8 @@
+from fastapi import Query
 from pydantic import BaseModel, field_validator, Field
 from typing import Optional
 from datetime import datetime, date
-from typing import List, Union
+from typing import List, Union, Dict
 from pydantic import validator
 import ast
 
@@ -44,6 +45,16 @@ class SimilarNews(BaseModel):
 #############################
 
 
+def parse_comma_separated_stock_list(
+    stock_list: Optional[str] = Query(
+        None, description="콤마(,)로 구분된 종목코드 리스트 (예: 005930,000660)"
+    )
+) -> Optional[List[str]]:
+    if stock_list is None or stock_list.strip() == "":
+        return None
+    return [s.strip() for s in stock_list.split(",") if s.strip()]
+
+
 class News_v2(BaseModel):
     news_id: str
     wdate: Optional[datetime]
@@ -74,8 +85,9 @@ class NewsOut_v2(BaseModel):
 class NewsOut_v2_Metadata(BaseModel):
     news_id: str
     summary: str
-    stock_list: Optional[List[str]] = []  # None이면 빈 리스트
-    industry_list: Optional[List[str]] = []  # None이면 빈 리스트
+    stock_list: Optional[List[Dict[str, str]]] = []
+    stock_list_view: Optional[List[Dict[str, str]]] = []
+    industry_list: Optional[List[Dict[str, str]]] = []
     impact_score: Optional[float]
 
     class Config:

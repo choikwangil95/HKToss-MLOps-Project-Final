@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import or_, desc
 from sqlalchemy import text
 from models.news import (
     NewsModel,
@@ -49,6 +49,7 @@ def get_news_list_v2(
     skip: int = 0,
     limit: int = 20,
     title: Optional[str] = None,
+    stock_list: Optional[List[str]] = None,
     start_datetime: Optional[datetime] = None,
     end_datetime: Optional[datetime] = None,
 ):
@@ -56,15 +57,25 @@ def get_news_list_v2(
 
     if title:
         query = query.filter(NewsModel_v2.title.ilike(f"%{title}%"))
-
     if start_datetime:
         query = query.filter(NewsModel_v2.wdate >= start_datetime)
     if end_datetime:
         query = query.filter(NewsModel_v2.wdate <= end_datetime)
 
-    news_list = query.order_by(desc(NewsModel_v2.wdate)).offset(skip).limit(limit).all()
+    if stock_list:
+        stock_conditions = [
+            NewsModel_v2_Metadata.stock_list.contains([{"stock_id": stock_id}])
+            for stock_id in stock_list
+        ]
+        if stock_conditions:
+            subquery = (
+                db.query(NewsModel_v2_Metadata.news_id)
+                .filter(or_(*stock_conditions))
+                .subquery(name="matched_news_ids")
+            )
+            query = query.filter(NewsModel_v2.news_id.in_(subquery))
 
-    return news_list
+    return query.order_by(desc(NewsModel_v2.wdate)).offset(skip).limit(limit).all()
 
 
 def get_news_detail(db: Session, news_id: str):
