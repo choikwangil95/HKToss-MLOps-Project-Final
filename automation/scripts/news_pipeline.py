@@ -396,6 +396,44 @@ def fetch_latest_news():
     return new_articles_crawled
 
 
+def enrich_stock_list(stock_names_raw, stock_name_to_code):
+    try:
+        stock_names = stock_names_raw
+        result = []
+        for name in stock_names:
+            code = stock_name_to_code.get(name)
+            if code:
+                result.append({"stock_id": code, "stock_name": name})
+        return result
+    except Exception:
+        return []
+
+
+def extract_industries(stock_list, code_to_industry):
+    if len(stock_list) == 0:
+        return []
+
+    industries = []
+    seen = set()
+    for stock in stock_list:
+        stock_id = stock.get("stock_id")
+        if stock_id is None:
+            continue
+        industry = code_to_industry.get(stock_id)
+        if industry:
+            key = (stock_id, industry["industry_id"])
+            if key not in seen:
+                seen.add(key)
+                industries.append(
+                    {
+                        "stock_id": stock_id,
+                        "industry_id": industry["industry_id"],
+                        "industry_name": industry["industry_name"],
+                    }
+                )
+    return industries
+
+
 # ──────────────────────────────
 # 📌 뉴스 수집 메인 함수
 # ──────────────────────────────
@@ -478,7 +516,10 @@ def get_stock_list(text):
 # 종목명 집합 불러오기
 def load_official_stock_list(krx_csv_path):
     df = pd.read_csv(krx_csv_path, encoding="cp949")
-    return list(set(df["종목명"].dropna().unique()))
+
+    stock_list = list(set(df["종목명"].dropna().unique()))
+    stock_name_to_code = dict(zip(df["종목명"], df["종목코드"]))
+    return stock_list, stock_name_to_code
 
 
 # 종목 리스트에서 공식 종목만 필터링
@@ -489,7 +530,18 @@ def filter_official_stocks_from_list(stock_list, official_stock_set):
 # 종목 → 업종 매핑 딕셔너리 생성
 def load_stock_to_industry_map(kospi_desc_csv_path):
     df = pd.read_csv(kospi_desc_csv_path, encoding="cp949")
-    return dict(zip(df["종목명"], df["업종명"]))
+
+    industry_list = dict(zip(df["종목명"], df["업종명"]))
+
+    code_to_industry = {
+        row["종목코드"]: {
+            "industry_id": str(row["업종코드"]),
+            "industry_name": row["업종명"],
+        }
+        for _, row in df.iterrows()
+    }
+
+    return industry_list, code_to_industry
 
 
 # 종목 리스트를 업종 리스트로 변환

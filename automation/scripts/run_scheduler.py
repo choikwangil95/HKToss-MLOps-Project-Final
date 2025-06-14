@@ -1,4 +1,6 @@
 from news_pipeline import (
+    enrich_stock_list,
+    extract_industries,
     fetch_latest_news,
     get_article_summary,
     get_stock_list,
@@ -21,10 +23,7 @@ import os
 log = logging.getLogger("news_logger")
 
 
-def job(
-    official_stock_set,
-    stock_to_industry,
-):
+def job(official_stock_set, stock_name_to_code, stock_to_industry, code_to_industry):
     log.info("🕒 [스케줄러] 뉴스 수집 실행")
 
     # ──────────────────────────────
@@ -69,10 +68,10 @@ def job(
 
     if len(filtered_news) != 0:
         for news in filtered_news:
-            news_article = news["article_preprocessed"]
+            news_article = news["article_preprocessed"][:300]
             summary = get_article_summary(news_article)
 
-            if len(summary) < 70:
+            if len(summary) < 30:
                 continue  # 본문 길이 짧으면 제외
 
             news["summary"] = summary
@@ -85,20 +84,30 @@ def job(
     # 3 뉴스 종목, 업종명 매칭 함수
     if len(summarzied_news) != 0:
         for news in summarzied_news:
+            # stock_list
             news_summary = news["summary"]
             stock_list = get_stock_list(news_summary)
-
-            # 여기서 필터링
             stock_list = filter_official_stocks_from_list(
                 stock_list, official_stock_set
             )
+            stock_list = enrich_stock_list(stock_list, stock_name_to_code)
             news["stock_list"] = stock_list
+
+            # stock_list_view
+            news_article = news["article"]
+            stock_list_view = get_stock_list(news_summary)
+            stock_list_view = filter_official_stocks_from_list(
+                stock_list_view, official_stock_set
+            )
+            stock_list_view = enrich_stock_list(stock_list_view, stock_name_to_code)
+            news["stock_list_view"] = stock_list_view
 
             # 종목 없거나 너무 많으면 제외
             if len(stock_list) > 4 or len(stock_list) < 1:
                 news["stock_list"] = None
 
             industry_list = get_industry_list_from_stocks(stock_list, stock_to_industry)
+            industry_list = extract_industries(stock_list, code_to_industry)
             news["industry_list"] = industry_list
 
             if len(industry_list) < 1:
@@ -141,8 +150,10 @@ if __name__ == "__main__":
         os.path.join(BASE_DIR, "../db/KRX_KOSPI_DESCRIPTION.csv")
     )
 
-    official_stock_set = load_official_stock_list(official_stock_path)
-    stock_to_industry = load_stock_to_industry_map(industry_map_path)
+    official_stock_set, stock_name_to_code = load_official_stock_list(
+        official_stock_path
+    )
+    stock_to_industry, code_to_industry = load_stock_to_industry_map(industry_map_path)
     log.info("🟢 KOSPI 데이터 로딩 완료")
 
     # log.info("🟡 LDA 모델 불러오는 중...")
@@ -161,16 +172,12 @@ if __name__ == "__main__":
     log.info("✅ run_scheduler.py 시작됨")
 
     # 첫 실행 즉시
-    job(
-        official_stock_set,
-        stock_to_industry,
-    )
+    job(official_stock_set, stock_name_to_code, stock_to_industry, code_to_industry)
 
     # 이후 매 1분마다 실행
-    schedule.every(1).minutes.do(
+    schedule.every(3).minutes.do(
         lambda: job(
-            official_stock_set,
-            stock_to_industry,
+            official_stock_set, stock_name_to_code, stock_to_industry, code_to_industry
         )
     )
 
