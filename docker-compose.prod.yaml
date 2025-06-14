@@ -1,6 +1,8 @@
 services:
   fastapi:
-    image: public.ecr.aws/s7y4j6x4/hktoss-mlops-final:latest
+    build:
+      context: ./fastapi
+      dockerfile: Dockerfile # fastapi 디렉토리 내부로 이동
     container_name: fastapi-app
     ports:
       - "8000:8000"
