@@ -318,12 +318,11 @@ def get_top_impact_news(
     stock_list: Optional[List[str]] = None,
 ) -> list[dict]:
     """특정 기간 내 상위 impact_score 뉴스 조회"""
-    # 1. 날짜 범위 유효성 검증
     if start_datetime >= end_datetime:
         raise ValueError("시작일은 종료일보다 앞서야 합니다.")
 
-    # 2. 조인 쿼리
-    results = (
+    # 기본 쿼리
+    query = (
         db.query(
             NewsModel_v2.news_id,
             NewsModel_v2.wdate,
@@ -342,9 +341,6 @@ def get_top_impact_news(
             NewsModel_v2.wdate < end_datetime,
             NewsModel_v2_Metadata.impact_score.isnot(None),
         )
-        .order_by(NewsModel_v2_Metadata.impact_score.desc())
-        .limit(limit)
-        .all()
     )
 
     # 종목 필터링 (JSONB contains 방식)
@@ -363,7 +359,6 @@ def get_top_impact_news(
         query.order_by(NewsModel_v2_Metadata.impact_score.desc()).limit(limit).all()
     )
 
-    # 3. 딕셔너리 형태로 변환
     return [
         {
             "news_id": row.news_id,
