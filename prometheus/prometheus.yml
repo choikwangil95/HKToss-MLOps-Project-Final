@@ -10,4 +10,4 @@ scrape_configs:
   honor_labels: true
   static_configs:
   - targets:
-    - modelapi-app  # metrics from model
+    - modelapi-app:8000  # metrics from model
