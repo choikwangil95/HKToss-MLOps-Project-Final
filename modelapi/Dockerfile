@@ -2,10 +2,15 @@ FROM python:3.10-slim
 
 # 필수 시스템 패키지 설치 (특히 psycopg2에 필요)
 RUN apt-get update && apt-get install -y \
+    openjdk-11-jdk && \
+    apt-get clean
     gcc \
     libpq-dev \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV PATH=$JAVA_HOME/bin:$PATH
 
 # 최신 pip 설치
 RUN pip install --upgrade pip
