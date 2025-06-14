@@ -1,15 +1,18 @@
 from news_pipeline import (
     enrich_stock_list,
     extract_industries,
+    NewsMarketPipeline,
     fetch_latest_news,
     get_article_summary,
     get_lda_topic,
     get_stock_list,
+    load_rate_df,
     remove_market_related_sentences,
     load_official_stock_list,
     filter_official_stocks_from_list,
     load_stock_to_industry_map,
     get_industry_list_from_stocks,
+    save_to_db_external,
     save_to_db_metadata,
     get_news_deduplicate_by_title,
     save_to_db,
@@ -20,12 +23,20 @@ import schedule
 import time
 import logging
 import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
 log = logging.getLogger("news_logger")
 
 
-def job(official_stock_set, stock_name_to_code, stock_to_industry, code_to_industry):
+def job(
+    official_stock_set,
+    stock_name_to_code,
+    stock_to_industry,
+    code_to_industry,
+    df_base_rate,
+):
     log.info("🕒 [스케줄러] 뉴스 수집 실행")
 
     # ──────────────────────────────
@@ -128,14 +139,19 @@ def job(official_stock_set, stock_name_to_code, stock_to_industry, code_to_indus
     # 3 뉴스 경제 및 행동 지표 피쳐 추가
     # - 주가 D+1~D+30 변동률, 금리, 환율, 기관 매매동향, 유가 등
     # ──────────────────────────────
+    if len(ner_news) != 0:
+        news_list = ner_news
+        pipeline = NewsMarketPipeline(news_list=news_list, df_base_rate=df_base_rate)
 
-    # 으악
+        market_datas = pipeline.run()
+
+        if market_datas:
+            save_to_db_external(market_datas)
 
     # ──────────────────────────────
     # 4 뉴스 시멘틱 피쳐 추가
     # - topic별 분포값, 클러스터 동일 여부
     # ──────────────────────────────
-
     topic_news = []
     if len(ner_news) != 0:
         for news in ner_news:
@@ -160,32 +176,51 @@ def job(official_stock_set, stock_name_to_code, stock_to_industry, code_to_indus
 
 
 if __name__ == "__main__":
+    # 데이터 불러오기
+
+    log.info("데이터 로딩 시작")
+
     # 현재 스크립트 기준 디렉토리 (automation/scripts/)
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    log.info("🟡 KOSPI 데이터 불러오는 중...")
     official_stock_path = os.path.abspath(
         os.path.join(BASE_DIR, "../db/KRX_KOSPI_STOCK.csv")
     )
-    industry_map_path = os.path.abspath(
-        os.path.join(BASE_DIR, "../db/KRX_KOSPI_DESCRIPTION.csv")
-    )
-
     official_stock_set, stock_name_to_code = load_official_stock_list(
         official_stock_path
     )
+
+    industry_map_path = os.path.abspath(
+        os.path.join(BASE_DIR, "../db/KRX_KOSPI_DESCRIPTION.csv")
+    )
     stock_to_industry, code_to_industry = load_stock_to_industry_map(industry_map_path)
-    log.info("🟢 KOSPI 데이터 로딩 완료")
+
+    korea_base_rate_daily_path = os.path.abspath(
+        os.path.join(BASE_DIR, "../db/korea_base_rate_daily.csv")
+    )
+    df_base_rate = load_rate_df(korea_base_rate_daily_path)
+
+    log.info("데이터 로딩 완료")
 
     log.info("✅ run_scheduler.py 시작됨")
 
     # 첫 실행 즉시
-    job(official_stock_set, stock_name_to_code, stock_to_industry, code_to_industry)
+    job(
+        official_stock_set,
+        stock_name_to_code,
+        stock_to_industry,
+        code_to_industry,
+        df_base_rate,
+    )
 
     # 이후 매 1분마다 실행
     schedule.every(1).minutes.do(
         lambda: job(
-            official_stock_set, stock_name_to_code, stock_to_industry, code_to_industry
+            official_stock_set,
+            stock_name_to_code,
+            stock_to_industry,
+            code_to_industry,
+            df_base_rate,
         )
     )
 

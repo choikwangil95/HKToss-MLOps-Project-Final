@@ -19,6 +19,8 @@ services:
      context: ./automation
      dockerfile: Dockerfile
    container_name: automation
+   env_file:
+      - .env
    depends_on:
      - db
    environment:

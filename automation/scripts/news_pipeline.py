@@ -15,6 +15,12 @@ import re
 import numpy as np
 import json
 import redis
+from dotenv import load_dotenv
+import ast
+from pykrx import stock
+from datetime import timedelta
+
+load_dotenv()
 
 # ──────────────────────────────
 # 📌 로그 설정
@@ -208,6 +214,9 @@ def save_to_db(articles):
         log.info("저장할 뉴스 없음")
         return
 
+    conn = None  # ✅ 먼저 None으로 초기화
+    cur = None
+
     try:
         DB_URL = os.getenv(
             "DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db"
@@ -262,8 +271,8 @@ def save_to_db_metadata(articles):
         cur = conn.cursor()
 
         insert_query = """
-		INSERT INTO news_v2_metadata (news_id, summary, stock_list, industry_list, impact_score)
-		VALUES (%s, %s, %s, %s, %s)
+		INSERT INTO news_v2_metadata (news_id, summary, stock_list, stock_list_view, industry_list, impact_score)
+		VALUES (%s, %s, %s, %s, %s, %s)
 		ON CONFLICT (news_id) DO NOTHING;
 		"""
 
@@ -274,6 +283,11 @@ def save_to_db_metadata(articles):
                 (
                     json.dumps(article["stock_list"])
                     if article["stock_list"] is not None
+                    else None
+                ),
+                (
+                    json.dumps(article["stock_list_view"])
+                    if article["stock_list_view"] is not None
                     else None
                 ),
                 (
@@ -306,34 +320,34 @@ def save_to_db_topics(articles):
         log.info("저장할 뉴스 없음")
         return
 
+    insert_query = """
+    INSERT INTO news_v2_topic (news_id, topic_1, topic_2, topic_3, topic_4, topic_5, topic_6, topic_7, topic_8, topic_9)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ON CONFLICT (news_id) DO NOTHING;
+    """
+
+    values = [
+        (
+            article["news_id"],
+            article["topic_1"],
+            article["topic_2"],
+            article["topic_3"],
+            article["topic_4"],
+            article["topic_5"],
+            article["topic_6"],
+            article["topic_7"],
+            article["topic_8"],
+            article["topic_9"],
+        )
+        for article in articles
+    ]
+
     try:
         DB_URL = os.getenv(
             "DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db"
         )
         conn = psycopg2.connect(DB_URL)
         cur = conn.cursor()
-
-        insert_query = """
-		INSERT INTO news_v2_topic (news_id, topic_1, topic_2, topic_3, topic_4, topic_5, topic_6, topic_7, topic_8, topic_9)
-		VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-		ON CONFLICT (news_id) DO NOTHING;
-		"""
-
-        values = [
-            (
-                article["news_id"],
-                article["topic_1"],
-                article["topic_2"],
-                article["topic_3"],
-                article["topic_4"],
-                article["topic_5"],
-                article["topic_6"],
-                article["topic_7"],
-                article["topic_8"],
-                article["topic_9"],
-            )
-            for article in articles
-        ]
 
         execute_batch(cur, insert_query, values)
         conn.commit()
@@ -348,6 +362,82 @@ def save_to_db_topics(articles):
             cur.close()
         if conn:
             conn.close()
+
+
+def save_to_db_external(market_datas):
+    if not market_datas:
+        log.info("저장할 뉴스 없음")
+        return
+
+    columns = [
+        "news_id",
+        "d_minus_5_date_close",
+        "d_minus_5_date_volume",
+        "d_minus_5_date_foreign",
+        "d_minus_5_date_institution",
+        "d_minus_5_date_individual",
+        "d_minus_4_date_close",
+        "d_minus_4_date_volume",
+        "d_minus_4_date_foreign",
+        "d_minus_4_date_institution",
+        "d_minus_4_date_individual",
+        "d_minus_3_date_close",
+        "d_minus_3_date_volume",
+        "d_minus_3_date_foreign",
+        "d_minus_3_date_institution",
+        "d_minus_3_date_individual",
+        "d_minus_2_date_close",
+        "d_minus_2_date_volume",
+        "d_minus_2_date_foreign",
+        "d_minus_2_date_institution",
+        "d_minus_2_date_individual",
+        "d_minus_1_date_close",
+        "d_minus_1_date_volume",
+        "d_minus_1_date_foreign",
+        "d_minus_1_date_institution",
+        "d_minus_1_date_individual",
+        "d_plus_1_date_close",
+        "d_plus_2_date_close",
+        "d_plus_3_date_close",
+        "d_plus_4_date_close",
+        "d_plus_5_date_close",
+        "fx",
+        "bond10y",
+        "base_rate",
+    ]
+
+    insert_query = f"""
+        INSERT INTO news_v2_external ({', '.join(columns)})
+        VALUES ({', '.join(['%s'] * len(columns))})
+        ON CONFLICT (news_id) DO NOTHING;
+    """
+
+    values = [
+        tuple(market_data.get(col, None) for col in columns)
+        for market_data in market_datas
+    ]
+
+    try:
+        DB_URL = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db"
+        )
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor()
+
+        execute_batch(cur, insert_query, values)
+        conn.commit()
+
+        log.info(f"🧾 External DB 저장 완료: {len(values)}건 저장")
+
+    except Exception as e:
+        log.error(f"❌ External DB 저장 중 오류 ({type(e).__name__}): {e}")
+
+    finally:
+        try:
+            cur.close()
+            conn.close()
+        except:
+            pass
 
 
 # ──────────────────────────────
@@ -604,6 +694,15 @@ def load_stock_to_industry_map(kospi_desc_csv_path):
     return industry_list, code_to_industry
 
 
+# 기준금리 데이터프레임 로드
+def load_rate_df(rate_path):
+    rate_df = pd.read_csv(rate_path)
+    rate_df["date"] = pd.to_datetime(rate_df["date"])
+    rate_df = rate_df.sort_values("date")
+
+    return rate_df
+
+
 # 종목 리스트를 업종 리스트로 변환
 def get_industry_list_from_stocks(stock_list, stock_to_industry):
     if len(stock_list) > 4 or len(stock_list) < 1:
@@ -699,6 +798,315 @@ def send_to_redis(news_data):
         log.info(f"Redis에 {len(news_data)}건 뉴스 푸시 완료")
     except Exception as e:
         log.error(f"Redis 푸시 실패 ({type(e).__name__}): {e}")
+
+
+class NewsMarketPipeline:
+
+    def __init__(self, news_list, df_base_rate):
+        self.api_key = os.getenv("KOREA_BANK_API_KEY")
+
+        self.df = pd.DataFrame(news_list)
+        self.ticker_name_map = None
+        self.trading_days = None
+        self.ohlcv_dict = {}
+        self.trading_dict = {}
+        self.fx_df = None
+        self.bond_df = None
+        self.rate_df = df_base_rate
+
+    def get_df(self):
+        return self.df
+
+    def extract_stock_name(self):
+        def extract_last(labels):
+            if pd.isna(labels) or labels == "[]" or labels == "":
+                return None
+            if isinstance(labels, str):
+                try:
+                    labels_list = ast.literal_eval(labels)
+                except Exception:
+                    return None
+            elif isinstance(labels, list):
+                labels_list = labels
+            else:
+                return None
+            if not labels_list:
+                return None
+            return labels_list[-1]
+
+        if "stock_list" not in self.df.columns:
+            raise Exception(
+                "stock_list 컬럼이 없습니다. 실제 컬럼: "
+                + str(self.df.columns.tolist())
+            )
+        self.df["stock_name"] = self.df["stock_list"].apply(extract_last)
+
+    def add_news_date(self):
+        if "wdate" in self.df.columns:
+            self.df["wdate"] = pd.to_datetime(self.df["wdate"])
+            self.df["news_date"] = self.df["wdate"].dt.normalize()
+        elif "news_date" in self.df.columns:
+            self.df["news_date"] = pd.to_datetime(self.df["news_date"])
+        else:
+            raise Exception(
+                "wdate/news_date 컬럼이 없습니다. 실제 컬럼: "
+                + str(self.df.columns.tolist())
+            )
+
+    def get_ticker_name_map(self, recent_date="2025-05-30"):
+        kospi_tickers = stock.get_market_ticker_list(date=recent_date, market="KOSPI")
+        mapping = {
+            stock.get_market_ticker_name(ticker): ticker for ticker in kospi_tickers
+        }
+        return mapping
+
+    def add_ticker(self):
+        if self.ticker_name_map is None:
+            self.ticker_name_map = self.get_ticker_name_map()
+
+        def get_ticker(name):
+            if pd.isna(name):
+                return None
+            return self.ticker_name_map.get(name)
+
+        self.df["ticker"] = self.df["stock_name"].apply(get_ticker)
+
+    def get_trading_days(self, start_year=2022, end_year=2026):
+        days = []
+        for y in range(start_year, end_year + 1):
+            for m in range(1, 13):
+                try:
+                    days_this_month = stock.get_previous_business_days(year=y, month=m)
+                    days.extend(days_this_month)
+                except Exception as e:
+                    pass
+        return pd.to_datetime(sorted(set(days)))
+
+    def find_nearest_trading_day(self, date):
+        after = self.trading_days[self.trading_days >= date]
+        return after[0] if len(after) > 0 else pd.NaT
+
+    def add_trading_dates(self):
+        if self.trading_days is None:
+            self.trading_days = self.get_trading_days()
+        self.df["d_day_date"] = self.df["news_date"].apply(
+            self.find_nearest_trading_day
+        )
+
+        offsets = {
+            "d_minus_5_date": -5,
+            "d_minus_4_date": -4,
+            "d_minus_3_date": -3,
+            "d_minus_2_date": -2,
+            "d_minus_1_date": -1,
+            "d_day_date": 0,
+        }
+
+        def fill_offsets(row):
+            d_day = row["d_day_date"]
+            res = {}
+            if pd.isna(d_day) or d_day not in self.trading_days.values:
+                for k in offsets.keys():
+                    res[k] = pd.NaT
+                return pd.Series(res)
+            idx = np.where(self.trading_days == d_day)[0][0]
+            for k, v in offsets.items():
+                i = idx + v
+                res[k] = (
+                    self.trading_days[i] if 0 <= i < len(self.trading_days) else pd.NaT
+                )
+            return pd.Series(res)
+
+        df_offsets = self.df.apply(fill_offsets, axis=1)
+
+        self.df.drop(columns=["d_day_date"], inplace=True)
+
+        # 인덱스 리셋 후 concat (중복 방지)
+        self.df = self.df.reset_index(drop=True)
+        df_offsets = df_offsets.reset_index(drop=True)
+        self.df = pd.concat([self.df, df_offsets], axis=1)
+
+    def fetch_ohlcv_and_trading(self):
+        offsets = [
+            "d_minus_5_date",
+            "d_minus_4_date",
+            "d_minus_3_date",
+            "d_minus_2_date",
+            "d_minus_1_date",
+        ]
+        all_dates = (
+            pd.concat([self.df[col] for col in offsets], ignore_index=True)
+            .dropna()
+            .unique()
+        )
+        all_dates_str = sorted(
+            [d.strftime("%Y%m%d") for d in pd.to_datetime(all_dates)]
+        )
+        tickers = self.df["ticker"].dropna().unique().tolist()
+        for ticker in tickers:
+            try:
+                ohlcv = stock.get_market_ohlcv_by_date(
+                    min(all_dates_str), max(all_dates_str), ticker
+                )
+                self.ohlcv_dict[ticker] = ohlcv
+            except Exception as e:
+                pass
+            try:
+                tv = stock.get_market_trading_value_by_date(
+                    min(all_dates_str), max(all_dates_str), ticker
+                )
+                self.trading_dict[ticker] = tv
+            except Exception as e:
+                pass
+
+    def add_ohlcv_and_trading(self):
+        offsets = [
+            "d_minus_5_date",
+            "d_minus_4_date",
+            "d_minus_3_date",
+            "d_minus_2_date",
+            "d_minus_1_date",
+        ]
+
+        def get_ohlcv_val(row, date_col, val_col):
+            ticker = row["ticker"]
+            date = row[date_col]
+            if pd.isna(ticker) or pd.isna(date):
+                return np.nan
+            df_ohlcv = self.ohlcv_dict.get(ticker)
+            if df_ohlcv is None:
+                return np.nan
+            date_str = date.strftime("%Y%m%d")
+            if date_str not in df_ohlcv.index:
+                return np.nan
+            return df_ohlcv.loc[date_str, val_col]
+
+        def get_trading_val(row, date_col, investor):
+            ticker = row["ticker"]
+            date = row[date_col]
+            if pd.isna(ticker) or pd.isna(date):
+                return np.nan
+            df_tv = self.trading_dict.get(ticker)
+            if df_tv is None:
+                return np.nan
+            date_str = date.strftime("%Y%m%d")
+            if date_str not in df_tv.index:
+                return np.nan
+            col_map = {"외국인": "외국인합계", "기관": "기관합계", "개인": "개인"}
+            return df_tv.loc[date_str, col_map[investor]]
+
+        for col in offsets:
+            self.df[f"{col}_close"] = self.df.apply(
+                lambda r: get_ohlcv_val(r, col, "종가"), axis=1
+            )
+            self.df[f"{col}_volume"] = self.df.apply(
+                lambda r: get_ohlcv_val(r, col, "거래량"), axis=1
+            )
+            self.df[f"{col}_foreign"] = self.df.apply(
+                lambda r: get_trading_val(r, col, "외국인"), axis=1
+            )
+            self.df[f"{col}_institution"] = self.df.apply(
+                lambda r: get_trading_val(r, col, "기관"), axis=1
+            )
+            self.df[f"{col}_individual"] = self.df.apply(
+                lambda r: get_trading_val(r, col, "개인"), axis=1
+            )
+
+    def fetch_fx(self, start_date, end_date):
+        if self.fx_df is not None:
+            return self.fx_df
+        stat_code = "731Y001"
+        item_code = "0000001"
+        url = f"https://ecos.bok.or.kr/api/StatisticSearch/{self.api_key}/json/kr/1/1000/{stat_code}/D/{start_date}/{end_date}/{item_code}/"
+        resp = requests.get(url)
+        data = resp.json()
+        if "StatisticSearch" not in data or "row" not in data["StatisticSearch"]:
+            print("[WARN] 환율 데이터 없음:", data)
+            return pd.DataFrame()
+        df = pd.DataFrame(data["StatisticSearch"]["row"])
+        df["date"] = pd.to_datetime(df["TIME"], format="%Y%m%d")
+        df["usdkrw"] = pd.to_numeric(df["DATA_VALUE"], errors="coerce")
+        df = df.sort_values("date")
+        self.fx_df = df[["date", "usdkrw"]]
+        return self.fx_df
+
+    def fetch_bond10y(self, start_date, end_date):
+        if self.bond_df is not None:
+            return self.bond_df
+        stat_code = "817Y002"
+        item_code = "010200000"
+        url = f"https://ecos.bok.or.kr/api/StatisticSearch/{self.api_key}/json/kr/1/1000/{stat_code}/D/{start_date}/{end_date}/{item_code}/"
+        resp = requests.get(url)
+        data = resp.json()
+        if "StatisticSearch" not in data or "row" not in data["StatisticSearch"]:
+            print("[WARN] 국채10년 데이터 없음:", data)
+            return pd.DataFrame()
+        df = pd.DataFrame(data["StatisticSearch"]["row"])
+        df["date"] = pd.to_datetime(df["TIME"], format="%Y%m%d")
+        df["bond10y"] = pd.to_numeric(df["DATA_VALUE"], errors="coerce")
+        df = df.sort_values("date")
+        self.bond_df = df[["date", "bond10y"]]
+        return self.bond_df
+
+    def add_external_vars(self):
+        self.df = self.df.sort_values("news_date")
+
+        start_date = (self.df["news_date"].min() - timedelta(days=1)).strftime("%Y%m%d")
+        end_date = (self.df["news_date"].max() - timedelta(days=1)).strftime("%Y%m%d")
+
+        fx_df = self.fetch_fx(start_date, end_date)
+        bond_df = self.fetch_bond10y(start_date, end_date)
+        fx_df = fx_df.sort_values("date")
+        bond_df = bond_df.sort_values("date")
+        self.df = pd.merge_asof(
+            self.df,
+            fx_df.rename(columns={"date": "news_date", "usdkrw": "fx"}),
+            on="news_date",
+            direction="backward",
+        )
+        self.df = pd.merge_asof(
+            self.df,
+            bond_df.rename(columns={"date": "news_date"}),
+            on="news_date",
+            direction="backward",
+        )
+        if self.rate_df is not None:
+            self.df = pd.merge_asof(
+                self.df,
+                self.rate_df.rename(columns={"date": "news_date", "rate": "base_rate"}),
+                on="news_date",
+                direction="backward",
+            )
+
+    def run(self):
+        self.extract_stock_name()
+        self.add_news_date()
+        self.add_ticker()
+        self.add_trading_dates()
+        self.fetch_ohlcv_and_trading()
+        self.add_ohlcv_and_trading()
+        self.add_external_vars()
+
+        self.df = self.df.drop(
+            columns=[
+                "wdate",
+                "stock_list",
+                "stock_name",
+                "news_date",
+                "ticker",
+                "d_minus_5_date",
+                "d_minus_4_date",
+                "d_minus_3_date",
+                "d_minus_2_date",
+                "d_minus_1_date",
+                "d_day_date",
+            ],
+            errors="ignore",
+        )
+
+        news_market_data = self.df.to_dict(orient="records")
+
+        return news_market_data
 
 
 if __name__ == "__main__":
