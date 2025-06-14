@@ -298,10 +298,10 @@ async def similar_news_v2(
     news_id: str = Path(..., description="기준이 되는 뉴스 ID"),
     top_n: int = Query(5, description="가장 유사한 뉴스 개수", ge=1, le=50),
     min_gap_days: int = Query(
-        180, description="기준 뉴스와 유사 뉴스 간 최소 시간 간격 (일 단위)"
+        90, description="기준 뉴스와 유사 뉴스 간 최소 시간 간격 (일 단위)"
     ),
     min_gap_between: int = Query(
-        90, description="유사 뉴스 간 최소 시간 간격 (일 단위)"
+        30, description="유사 뉴스 간 최소 시간 간격 (일 단위)"
     ),
     db: Session = Depends(get_db),
 ):
