@@ -1,5 +1,7 @@
 import numpy as np
 
+from modelapi.schemas.model import SimilarNewsItem
+
 
 def get_news_summary(
     text,
@@ -159,15 +161,22 @@ def get_news_similar_list(payload, request):
     # 검색
     results = vectordb.similarity_search_with_score(article, k=top_k)
 
-    news_similar_list = [
-        {
-            "news_id": doc.metadata["news_id"],
-            "summary": doc.page_content,
-            "wdate": doc.metadata["wdate"],
-            "score": 1 - float(score),
-        }
-        for doc, score in results
-    ]
+    news_similar_list = []
+    for doc, score in results:
+        news_id = doc.metadata.get("news_id")
+        wdate = doc.metadata.get("wdate")
+        summary = doc.page_content
 
-    # (1, 768) → List[List[float]]
+        if not news_id or not wdate or not summary:
+            continue
+
+        news_similar_list.append(
+            SimilarNewsItem(
+                news_id=news_id,
+                summary=summary,
+                wdate=wdate,
+                score=round(1 - float(score), 2),
+            )
+        )
+
     return news_similar_list

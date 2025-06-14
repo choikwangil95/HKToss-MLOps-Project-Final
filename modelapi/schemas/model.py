@@ -48,7 +48,4 @@ class SimilarNewsItem(BaseModel):
 
 
 class SimilarNewsOut(BaseModel):
-    similar_news_list: List[SimilarNewsItem] = Field(
-        default_factory=list,
-        description="유사 뉴스 리스트",
-    )
+    similar_news_list: List[SimilarNewsItem]
