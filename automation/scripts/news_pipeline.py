@@ -538,7 +538,7 @@ def enrich_stock_list(stock_names_raw, stock_name_to_code):
         for name in stock_names:
             code = stock_name_to_code.get(name)
             if code:
-                result.append({"stock_id": code, "stock_name": name})
+                result.append({"stock_id": str(code), "stock_name": name})
         return result
     except Exception:
         return []
@@ -561,7 +561,7 @@ def extract_industries(stock_list, code_to_industry):
                 seen.add(key)
                 industries.append(
                     {
-                        "stock_id": stock_id,
+                        "stock_id": str(stock_id),
                         "industry_id": industry["industry_id"],
                         "industry_name": industry["industry_name"],
                     }
@@ -1091,6 +1091,31 @@ class NewsMarketPipeline:
             print(f"[WARN] Drop columns failed: {e}")
 
         try:
+            # 기준 컬럼들
+            prefixes = ["close", "volume", "institution", "foreign", "individual"]
+            days = ["d_minus_5", "d_minus_4", "d_minus_3", "d_minus_2"]
+
+            # 등락률 계산
+            for prefix in prefixes:
+                d_minus_1_col = f"d_minus_1_date_{prefix}"
+
+                # d-1 컬럼에 NaN 있으면 전체 스킵
+                if self.df[d_minus_1_col].isna().any():
+                    continue
+
+                for day in days:
+                    col = f"{day}_date_{prefix}"
+
+                    # 비교 대상 컬럼에 NaN 있으면 해당 day 루프 스킵
+                    if self.df[col].isna().any():
+                        continue
+
+                    self.df[col] = np.round(
+                        (self.df[d_minus_1_col] - self.df[col])
+                        / self.df[d_minus_1_col],
+                        2,
+                    )
+
             return self.df.to_dict(orient="records")
         except Exception as e:
             print(f"[ERROR] Converting to dict failed: {e}")
