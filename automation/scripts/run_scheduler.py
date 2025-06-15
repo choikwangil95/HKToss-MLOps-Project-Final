@@ -117,9 +117,9 @@ def job(
             stock_list_view = enrich_stock_list(stock_list_view, stock_name_to_code)
             news["stock_list_view"] = stock_list_view
 
-            # 종목 없거나 너무 많으면 제외
-            if len(stock_list) > 4 or len(stock_list) < 1:
-                news["stock_list"] = None
+            # 종목 없으면 제외
+            if len(stock_list) < 1:
+                continue
 
             industry_list = get_industry_list_from_stocks(stock_list, stock_to_industry)
             industry_list = extract_industries(stock_list, code_to_industry)
