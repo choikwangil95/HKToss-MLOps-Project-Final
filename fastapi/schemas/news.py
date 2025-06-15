@@ -93,7 +93,7 @@ class NewsOut_v2_Metadata(BaseModel):
     class Config:
         from_attributes = True
 
-    @field_validator("stock_list", "industry_list", mode="before")
+    @field_validator("stock_list", "stock_list_view", "industry_list", mode="before")
     @classmethod
     def parse_list(cls, v):
         if v is None:
