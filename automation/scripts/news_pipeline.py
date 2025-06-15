@@ -440,6 +440,43 @@ def save_to_db_external(market_datas):
             pass
 
 
+def update_db_impact_score(score_datas):
+    if not score_datas:
+        log.info("업데이트할 데이터 없음")
+        return
+
+    update_query = """
+        UPDATE news_v2_metadata
+        SET impact_score = %s
+        WHERE news_id = %s;
+    """
+
+    # values는 (impact_score, news_id) 순서
+    values = [(data["score"], data["news_id"]) for data in score_datas]
+
+    try:
+        DB_URL = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db"
+        )
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor()
+
+        execute_batch(cur, update_query, values)
+        conn.commit()
+
+        log.info(f"🧾 Impact Score 업데이트 완료: {len(values)}건")
+
+    except Exception as e:
+        log.error(f"❌ Impact Score 업데이트 오류 ({type(e).__name__}): {e}")
+
+    finally:
+        try:
+            cur.close()
+            conn.close()
+        except:
+            pass
+
+
 # ──────────────────────────────
 # 📌 뉴스 수집 메인 함수
 # ──────────────────────────────
@@ -1120,6 +1157,31 @@ class NewsMarketPipeline:
         except Exception as e:
             print(f"[ERROR] Converting to dict failed: {e}")
             return []
+
+
+def get_impact_score(market_datas):
+    score_datas = [
+        {
+            "news_id": market_data["news_id"],
+            "score": max(
+                market_data["d_minus_1_date_close"],
+                market_data["d_minus_2_date_close"],
+                market_data["d_minus_3_date_close"],
+                market_data["d_minus_4_date_close"],
+                market_data["d_minus_5_date_close"],
+            )
+            - min(
+                market_data["d_minus_1_date_close"],
+                market_data["d_minus_2_date_close"],
+                market_data["d_minus_3_date_close"],
+                market_data["d_minus_4_date_close"],
+                market_data["d_minus_5_date_close"],
+            ),
+        }
+        for market_data in market_datas
+    ]
+
+    return score_datas
 
 
 if __name__ == "__main__":

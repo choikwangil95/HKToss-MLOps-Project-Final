@@ -4,6 +4,7 @@ from news_pipeline import (
     NewsMarketPipeline,
     fetch_latest_news,
     get_article_summary,
+    get_impact_score,
     get_lda_topic,
     get_stock_list,
     load_rate_df,
@@ -18,6 +19,7 @@ from news_pipeline import (
     save_to_db,
     save_to_db_topics,
     send_to_redis,
+    update_db_impact_score,
 )
 import schedule
 import time
@@ -147,6 +149,10 @@ def job(
 
         if market_datas:
             save_to_db_external(market_datas)
+
+            score_datas = get_impact_score(market_datas)
+
+            update_db_impact_score(score_datas)
 
     # ──────────────────────────────
     # 4 뉴스 시멘틱 피쳐 추가
