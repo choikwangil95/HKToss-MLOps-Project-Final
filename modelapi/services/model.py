@@ -219,6 +219,6 @@ def get_lda_topic(text, request):
 
     lda_topics = {}
     for index, value in enumerate(topic_distribution[0]):
-        lda_topics[f"topic {index}"] = value
+        lda_topics[f"topic_{index}"] = value
 
     return lda_topics
