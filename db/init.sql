@@ -139,14 +139,14 @@ END $$;
 -- news_v2 테이블 생성
 CREATE TABLE news_v2_topic (
   news_id VARCHAR PRIMARY KEY,
-  topic_1 FLOAT
-  topic_2 FLOAT
-  topic_3 FLOAT
-  topic_4 FLOAT
-  topic_5 FLOAT
-  topic_6 FLOAT
-  topic_7 FLOAT
-  topic_8 FLOAT
+  topic_1 FLOAT,
+  topic_2 FLOAT,
+  topic_3 FLOAT,
+  topic_4 FLOAT,
+  topic_5 FLOAT,
+  topic_6 FLOAT,
+  topic_7 FLOAT,
+  topic_8 FLOAT,
   topic_9 FLOAT
 );
 
