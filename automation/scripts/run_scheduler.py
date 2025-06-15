@@ -53,10 +53,6 @@ def job(
         # title 중복 제거
         news_crawled = get_news_deduplicate_by_title(news_crawled)
 
-        save_to_db(news_crawled)
-
-        send_to_redis(news_crawled)
-
     # ──────────────────────────────
     # 2 뉴스 전처리
     # - 본문 전처리 및 요약, 종목과 업종명 매칭
@@ -76,8 +72,6 @@ def job(
             news["article_preprocessed"] = news_article_preprocessed
             filtered_news.append(news)
 
-    print(f"\n필터링된 뉴스 {filtered_news}\n")
-
     # 2 뉴스 본문 요악 함수
     summarzied_news = []
 
@@ -92,11 +86,9 @@ def job(
             news["summary"] = summary
             summarzied_news.append(news)
 
-    print(f"\n요약된 뉴스  {summarzied_news}\n")
-
+    # 3 뉴스 종목, 업종명 매칭 함수
     ner_news = []
 
-    # 3 뉴스 종목, 업종명 매칭 함수
     if len(summarzied_news) != 0:
         for news in summarzied_news:
             # stock_list
@@ -134,6 +126,15 @@ def job(
             ner_news = get_news_deduplicate_by_title(ner_news)
 
     print(f"\n종목, 업종명 매칭 뉴스 {ner_news}\n")
+
+    # ──────────────────────────────
+    # 2 뉴스 저장
+    # - 종목이 매칭되는 뉴스만 수집 및 저장하기
+    # ──────────────────────────────
+
+    save_to_db(ner_news)
+
+    send_to_redis(ner_news)
 
     save_to_db_metadata(ner_news)
 

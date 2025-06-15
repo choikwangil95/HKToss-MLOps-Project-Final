@@ -66,7 +66,7 @@ def get_news_list_v2(
     # 종목 필터링 - JSONB contains 사용
     if stock_list:
         stock_conditions = [
-            cast(NewsModel_v2_Metadata.stock_list, JSONB).contains(
+            cast(NewsModel_v2_Metadata.stock_list_view, JSONB).contains(
                 [{"stock_id": stock_id}]
             )
             for stock_id in stock_list
