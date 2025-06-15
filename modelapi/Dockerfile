@@ -19,7 +19,7 @@ RUN pip install --upgrade pip
 # 4. 의존성 먼저 복사 (캐시 최적화)
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
 # 5. 앱 코드 복사
 WORKDIR /modelapi
