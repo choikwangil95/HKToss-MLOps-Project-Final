@@ -281,17 +281,17 @@ def save_to_db_metadata(articles):
                 article["news_id"],
                 article["summary"],
                 (
-                    json.dumps(article["stock_list"])
+                    json.dumps(article["stock_list"], ensure_ascii=False)
                     if article["stock_list"] is not None
                     else None
                 ),
                 (
-                    json.dumps(article["stock_list_view"])
+                    json.dumps(article["stock_list_view"], ensure_ascii=False)
                     if article["stock_list_view"] is not None
                     else None
                 ),
                 (
-                    json.dumps(article["industry_list"])
+                    json.dumps(article["industry_list"], ensure_ascii=False)
                     if article["industry_list"] is not None
                     else None
                 ),
@@ -819,28 +819,20 @@ class NewsMarketPipeline:
         return self.df
 
     def extract_stock_name(self):
-        def extract_last(labels):
-            if pd.isna(labels) or labels == "[]" or labels == "":
-                return None
-            if isinstance(labels, str):
-                try:
-                    labels_list = ast.literal_eval(labels)
-                except Exception:
-                    return None
-            elif isinstance(labels, list):
-                labels_list = labels
-            else:
-                return None
-            if not labels_list:
-                return None
-            return labels_list[-1]
-
         if "stock_list" not in self.df.columns:
             raise Exception(
                 "stock_list 컬럼이 없습니다. 실제 컬럼: "
                 + str(self.df.columns.tolist())
             )
-        self.df["stock_name"] = self.df["stock_list"].apply(extract_last)
+
+        def get_last_stock_name(x):
+            try:
+                items = ast.literal_eval(x) if isinstance(x, str) else x
+                return items[-1]["stock_name"] if items else None
+            except:
+                return None
+
+        self.df["stock_name"] = self.df["stock_list"].apply(get_last_stock_name)
 
     def add_news_date(self):
         if "wdate" in self.df.columns:
@@ -856,21 +848,17 @@ class NewsMarketPipeline:
 
     def get_ticker_name_map(self, recent_date="2025-05-30"):
         kospi_tickers = stock.get_market_ticker_list(date=recent_date, market="KOSPI")
-        mapping = {
+        return {
             stock.get_market_ticker_name(ticker): ticker for ticker in kospi_tickers
         }
-        return mapping
 
     def add_ticker(self):
         if self.ticker_name_map is None:
             self.ticker_name_map = self.get_ticker_name_map()
 
-        def get_ticker(name):
-            if pd.isna(name):
-                return None
-            return self.ticker_name_map.get(name)
-
-        self.df["ticker"] = self.df["stock_name"].apply(get_ticker)
+        self.df["ticker"] = self.df["stock_name"].apply(
+            lambda name: self.ticker_name_map.get(name) if pd.notna(name) else None
+        )
 
     def get_trading_days(self, start_year=2022, end_year=2026):
         days = []
@@ -879,19 +867,22 @@ class NewsMarketPipeline:
                 try:
                     days_this_month = stock.get_previous_business_days(year=y, month=m)
                     days.extend(days_this_month)
-                except Exception as e:
+                except:
                     pass
         return pd.to_datetime(sorted(set(days)))
 
-    def find_nearest_trading_day(self, date):
-        after = self.trading_days[self.trading_days >= date]
-        return after[0] if len(after) > 0 else pd.NaT
+    def adjust_to_nearest_trading_day(self, date):
+        idx = self.trading_days.searchsorted(date, side="right") - 1
+        if idx >= 0:
+            return self.trading_days[idx]
+        return pd.NaT
 
     def add_trading_dates(self):
         if self.trading_days is None:
             self.trading_days = self.get_trading_days()
+
         self.df["d_day_date"] = self.df["news_date"].apply(
-            self.find_nearest_trading_day
+            self.adjust_to_nearest_trading_day
         )
 
         offsets = {
@@ -905,12 +896,24 @@ class NewsMarketPipeline:
 
         def fill_offsets(row):
             d_day = row["d_day_date"]
+            if not pd.isna(d_day):
+                weekday = d_day.weekday()
+                if weekday == 5:
+                    d_day = self.adjust_to_nearest_trading_day(
+                        d_day - timedelta(days=1)
+                    )
+                elif weekday == 6:
+                    d_day = self.adjust_to_nearest_trading_day(
+                        d_day - timedelta(days=2)
+                    )
+
             res = {}
-            if pd.isna(d_day) or d_day not in self.trading_days.values:
-                for k in offsets.keys():
+            if pd.isna(d_day):
+                for k in offsets:
                     res[k] = pd.NaT
                 return pd.Series(res)
-            idx = np.where(self.trading_days == d_day)[0][0]
+
+            idx = self.trading_days.searchsorted(d_day)
             for k, v in offsets.items():
                 i = idx + v
                 res[k] = (
@@ -919,159 +922,140 @@ class NewsMarketPipeline:
             return pd.Series(res)
 
         df_offsets = self.df.apply(fill_offsets, axis=1)
-
-        self.df.drop(columns=["d_day_date"], inplace=True)
-
-        # 인덱스 리셋 후 concat (중복 방지)
-        self.df = self.df.reset_index(drop=True)
-        df_offsets = df_offsets.reset_index(drop=True)
-        self.df = pd.concat([self.df, df_offsets], axis=1)
+        self.df = pd.concat(
+            [self.df.reset_index(drop=True), df_offsets.reset_index(drop=True)], axis=1
+        )
 
     def fetch_ohlcv_and_trading(self):
-        offsets = [
-            "d_minus_5_date",
-            "d_minus_4_date",
-            "d_minus_3_date",
-            "d_minus_2_date",
-            "d_minus_1_date",
-        ]
+        offsets = [f"d_minus_{i}_date" for i in range(1, 6)]
         all_dates = (
             pd.concat([self.df[col] for col in offsets], ignore_index=True)
             .dropna()
             .unique()
         )
         all_dates_str = sorted(
-            [d.strftime("%Y%m%d") for d in pd.to_datetime(all_dates)]
+            [pd.to_datetime(d).strftime("%Y%m%d") for d in all_dates]
         )
         tickers = self.df["ticker"].dropna().unique().tolist()
+
         for ticker in tickers:
             try:
-                ohlcv = stock.get_market_ohlcv_by_date(
+                self.ohlcv_dict[ticker] = stock.get_market_ohlcv_by_date(
                     min(all_dates_str), max(all_dates_str), ticker
                 )
-                self.ohlcv_dict[ticker] = ohlcv
-            except Exception as e:
+            except:
                 pass
             try:
-                tv = stock.get_market_trading_value_by_date(
+                self.trading_dict[ticker] = stock.get_market_trading_value_by_date(
                     min(all_dates_str), max(all_dates_str), ticker
                 )
-                self.trading_dict[ticker] = tv
-            except Exception as e:
+            except:
                 pass
 
     def add_ohlcv_and_trading(self):
-        offsets = [
-            "d_minus_5_date",
-            "d_minus_4_date",
-            "d_minus_3_date",
-            "d_minus_2_date",
-            "d_minus_1_date",
-        ]
+        offsets = [f"d_minus_{i}_date" for i in range(1, 6)]
 
-        def get_ohlcv_val(row, date_col, val_col):
-            ticker = row["ticker"]
-            date = row[date_col]
-            if pd.isna(ticker) or pd.isna(date):
-                return np.nan
-            df_ohlcv = self.ohlcv_dict.get(ticker)
-            if df_ohlcv is None:
-                return np.nan
-            date_str = date.strftime("%Y%m%d")
-            if date_str not in df_ohlcv.index:
-                return np.nan
-            return df_ohlcv.loc[date_str, val_col]
+        all_ohlcv_rows = []
+        for ticker, df in self.ohlcv_dict.items():
+            df = df.reset_index().rename(columns={"날짜": "date"})
+            df["ticker"] = ticker
+            all_ohlcv_rows.append(df[["date", "ticker", "종가", "거래량"]])
+        df_ohlcv_all = pd.concat(all_ohlcv_rows) if all_ohlcv_rows else pd.DataFrame()
 
-        def get_trading_val(row, date_col, investor):
-            ticker = row["ticker"]
-            date = row[date_col]
-            if pd.isna(ticker) or pd.isna(date):
-                return np.nan
-            df_tv = self.trading_dict.get(ticker)
-            if df_tv is None:
-                return np.nan
-            date_str = date.strftime("%Y%m%d")
-            if date_str not in df_tv.index:
-                return np.nan
-            col_map = {"외국인": "외국인합계", "기관": "기관합계", "개인": "개인"}
-            return df_tv.loc[date_str, col_map[investor]]
+        all_trading_rows = []
+        for ticker, df in self.trading_dict.items():
+            df = df.reset_index().rename(columns={"날짜": "date"})
+            df["ticker"] = ticker
+            df = df[["date", "ticker", "외국인합계", "기관합계", "개인"]]
+            all_trading_rows.append(df)
+        df_trading_all = (
+            pd.concat(all_trading_rows) if all_trading_rows else pd.DataFrame()
+        )
 
         for col in offsets:
-            self.df[f"{col}_close"] = self.df.apply(
-                lambda r: get_ohlcv_val(r, col, "종가"), axis=1
+            self.df = (
+                self.df.merge(
+                    df_ohlcv_all,
+                    how="left",
+                    left_on=[col, "ticker"],
+                    right_on=["date", "ticker"],
+                )
+                .rename(columns={"종가": f"{col}_close", "거래량": f"{col}_volume"})
+                .drop(columns="date")
             )
-            self.df[f"{col}_volume"] = self.df.apply(
-                lambda r: get_ohlcv_val(r, col, "거래량"), axis=1
-            )
-            self.df[f"{col}_foreign"] = self.df.apply(
-                lambda r: get_trading_val(r, col, "외국인"), axis=1
-            )
-            self.df[f"{col}_institution"] = self.df.apply(
-                lambda r: get_trading_val(r, col, "기관"), axis=1
-            )
-            self.df[f"{col}_individual"] = self.df.apply(
-                lambda r: get_trading_val(r, col, "개인"), axis=1
+            self.df = (
+                self.df.merge(
+                    df_trading_all,
+                    how="left",
+                    left_on=[col, "ticker"],
+                    right_on=["date", "ticker"],
+                )
+                .rename(
+                    columns={
+                        "외국인합계": f"{col}_foreign",
+                        "기관합계": f"{col}_institution",
+                        "개인": f"{col}_individual",
+                    }
+                )
+                .drop(columns="date")
             )
 
     def fetch_fx(self, start_date, end_date):
         if self.fx_df is not None:
             return self.fx_df
-        stat_code = "731Y001"
-        item_code = "0000001"
-        url = f"https://ecos.bok.or.kr/api/StatisticSearch/{self.api_key}/json/kr/1/1000/{stat_code}/D/{start_date}/{end_date}/{item_code}/"
-        resp = requests.get(url)
-        data = resp.json()
-        if "StatisticSearch" not in data or "row" not in data["StatisticSearch"]:
-            print("[WARN] 환율 데이터 없음:", data)
+        url = f"https://ecos.bok.or.kr/api/StatisticSearch/{self.api_key}/json/kr/1/1000/731Y001/D/{start_date}/{end_date}/0000001/"
+        resp = requests.get(url).json()
+        if "StatisticSearch" not in resp or "row" not in resp["StatisticSearch"]:
             return pd.DataFrame()
-        df = pd.DataFrame(data["StatisticSearch"]["row"])
+        df = pd.DataFrame(resp["StatisticSearch"]["row"])
         df["date"] = pd.to_datetime(df["TIME"], format="%Y%m%d")
         df["usdkrw"] = pd.to_numeric(df["DATA_VALUE"], errors="coerce")
-        df = df.sort_values("date")
-        self.fx_df = df[["date", "usdkrw"]]
+        self.fx_df = df[["date", "usdkrw"]].sort_values("date")
         return self.fx_df
 
     def fetch_bond10y(self, start_date, end_date):
         if self.bond_df is not None:
             return self.bond_df
-        stat_code = "817Y002"
-        item_code = "010200000"
-        url = f"https://ecos.bok.or.kr/api/StatisticSearch/{self.api_key}/json/kr/1/1000/{stat_code}/D/{start_date}/{end_date}/{item_code}/"
-        resp = requests.get(url)
-        data = resp.json()
-        if "StatisticSearch" not in data or "row" not in data["StatisticSearch"]:
-            print("[WARN] 국채10년 데이터 없음:", data)
+        url = f"https://ecos.bok.or.kr/api/StatisticSearch/{self.api_key}/json/kr/1/1000/817Y002/D/{start_date}/{end_date}/010200000/"
+        resp = requests.get(url).json()
+        if "StatisticSearch" not in resp or "row" not in resp["StatisticSearch"]:
             return pd.DataFrame()
-        df = pd.DataFrame(data["StatisticSearch"]["row"])
+        df = pd.DataFrame(resp["StatisticSearch"]["row"])
         df["date"] = pd.to_datetime(df["TIME"], format="%Y%m%d")
         df["bond10y"] = pd.to_numeric(df["DATA_VALUE"], errors="coerce")
-        df = df.sort_values("date")
-        self.bond_df = df[["date", "bond10y"]]
+        self.bond_df = df[["date", "bond10y"]].sort_values("date")
         return self.bond_df
 
     def add_external_vars(self):
         self.df = self.df.sort_values("news_date")
+        if self.trading_days is None:
+            self.trading_days = self.get_trading_days()
+        raw_start = self.df["news_date"].min() - timedelta(days=1)
+        raw_end = self.df["news_date"].max() - timedelta(days=1)
+        start_date = self.adjust_to_nearest_trading_day(raw_start)
+        end_date = self.adjust_to_nearest_trading_day(raw_end)
+        if pd.isna(start_date) or pd.isna(end_date):
+            return
 
-        start_date = (self.df["news_date"].min() - timedelta(days=1)).strftime("%Y%m%d")
-        end_date = (self.df["news_date"].max() - timedelta(days=1)).strftime("%Y%m%d")
+        start_str, end_str = start_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d")
+        fx_df = self.fetch_fx(start_str, end_str)
+        bond_df = self.fetch_bond10y(start_str, end_str)
 
-        fx_df = self.fetch_fx(start_date, end_date)
-        bond_df = self.fetch_bond10y(start_date, end_date)
-        fx_df = fx_df.sort_values("date")
-        bond_df = bond_df.sort_values("date")
-        self.df = pd.merge_asof(
-            self.df,
-            fx_df.rename(columns={"date": "news_date", "usdkrw": "fx"}),
-            on="news_date",
-            direction="backward",
-        )
-        self.df = pd.merge_asof(
-            self.df,
-            bond_df.rename(columns={"date": "news_date"}),
-            on="news_date",
-            direction="backward",
-        )
-        if self.rate_df is not None:
+        if not fx_df.empty:
+            self.df = pd.merge_asof(
+                self.df,
+                fx_df.rename(columns={"date": "news_date", "usdkrw": "fx"}),
+                on="news_date",
+                direction="backward",
+            )
+        if not bond_df.empty:
+            self.df = pd.merge_asof(
+                self.df,
+                bond_df.rename(columns={"date": "news_date"}),
+                on="news_date",
+                direction="backward",
+            )
+        if self.rate_df is not None and not self.rate_df.empty:
             self.df = pd.merge_asof(
                 self.df,
                 self.rate_df.rename(columns={"date": "news_date", "rate": "base_rate"}),
@@ -1080,34 +1064,37 @@ class NewsMarketPipeline:
             )
 
     def run(self):
-        self.extract_stock_name()
-        self.add_news_date()
-        self.add_ticker()
-        self.add_trading_dates()
-        self.fetch_ohlcv_and_trading()
-        self.add_ohlcv_and_trading()
-        self.add_external_vars()
+        steps = [
+            ("extract_stock_name", self.extract_stock_name),
+            ("add_news_date", self.add_news_date),
+            ("add_ticker", self.add_ticker),
+            ("add_trading_dates", self.add_trading_dates),
+            ("fetch_ohlcv_and_trading", self.fetch_ohlcv_and_trading),
+            ("add_ohlcv_and_trading", self.add_ohlcv_and_trading),
+            ("add_external_vars", self.add_external_vars),
+        ]
 
-        self.df = self.df.drop(
-            columns=[
-                "wdate",
-                "stock_list",
-                "stock_name",
-                "news_date",
-                "ticker",
-                "d_minus_5_date",
-                "d_minus_4_date",
-                "d_minus_3_date",
-                "d_minus_2_date",
-                "d_minus_1_date",
-                "d_day_date",
-            ],
-            errors="ignore",
-        )
+        for step_name, func in steps:
+            try:
+                func()
+            except Exception as e:
+                print(f"[ERROR] Step '{step_name}' failed: {e}")
 
-        news_market_data = self.df.to_dict(orient="records")
+        try:
+            self.df = self.df.drop(
+                columns=["wdate", "stock_list", "stock_name", "news_date", "ticker"]
+                + [f"d_minus_{i}_date" for i in range(1, 6)]
+                + ["d_day_date"],
+                errors="ignore",
+            )
+        except Exception as e:
+            print(f"[WARN] Drop columns failed: {e}")
 
-        return news_market_data
+        try:
+            return self.df.to_dict(orient="records")
+        except Exception as e:
+            print(f"[ERROR] Converting to dict failed: {e}")
+            return []
 
 
 if __name__ == "__main__":
