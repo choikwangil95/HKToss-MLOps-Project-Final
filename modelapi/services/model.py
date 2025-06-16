@@ -4,6 +4,7 @@ from konlpy.tag import Okt
 import numpy as np
 
 from schemas.model import SimilarNewsItem
+from models.rag_pipeline import NewsTossChatbot
 
 
 def get_news_summary(
@@ -222,3 +223,8 @@ def get_lda_topic(text, request):
         lda_topics[f"topic_{index+1}"] = value
 
     return lda_topics
+# 싱글턴 객체로 관리 (여러 요청에서 재사용)
+chatbot = NewsTossChatbot()
+
+def get_answer(question: str, top_k: int = 5) -> str:
+    return chatbot.answer(question, top_k=top_k)

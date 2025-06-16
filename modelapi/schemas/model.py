@@ -58,3 +58,12 @@ class LdaTopicsIn(BaseModel):
 
 class LdaTopicsOut(BaseModel):
     lda_topics: Dict[str, float]  # 예: {"topic1": 0.15, "topic2": 0.03, ...}
+
+
+class ChatRequest(BaseModel):
+    question: str
+    top_k: int = 5
+
+
+class ChatResponse(BaseModel):
+    answer: str
