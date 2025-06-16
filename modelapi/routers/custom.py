@@ -10,6 +10,12 @@ from services.model import (
     get_news_similar_list,
 )
 
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+import openai
+import os
+import json
+
 router = APIRouter(
     prefix="/news",
     tags=["Custom Model"],
