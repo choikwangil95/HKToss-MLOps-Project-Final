@@ -4,6 +4,7 @@ FROM python:3.10-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jdk \
     gcc \
+    g++ \
     libpq-dev \
     build-essential \
     curl \

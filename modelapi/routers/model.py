@@ -3,6 +3,8 @@ from schemas.model import (
     EmbeddingIn,
     EmbeddingOut,
     StockOut,
+    SimilarNewsIn,
+    SimilarNewsOut,
     SummaryOut,
     SummaryIn,
     StockIn,
@@ -94,3 +96,30 @@ async def get_news_embedding_router(request: Request, payload: EmbeddingIn):
         )
 
     return {"embedding": embedding}
+
+
+@router.post(
+    "/similar_news",
+    response_model=SimilarNewsOut,
+    summary="유사 뉴스 top-k",
+    description="유사 뉴스 top-k",
+)
+async def get_news_embedding_router(request: Request, payload: SimilarNewsIn):
+    """
+    유사 뉴스 top-k
+    """
+    article = payload.article
+    if not article:
+        raise HTTPException(
+            status_code=400,
+            detail="기사 본문이 비어있습니다. 올바른 본문을 입력해주세요.",
+        )
+
+    similar_news_list = get_news_similar_list(payload, request)
+    if similar_news_list is None:
+        raise HTTPException(
+            status_code=500,
+            detail="유사 뉴스 조회 중 오류가 발생했습니다. 다시 시도해주세요.",
+        )
+
+    return {"similar_news_list": similar_news_list}

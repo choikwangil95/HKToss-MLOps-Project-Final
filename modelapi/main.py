@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from routers import status, model, custom
 from load_models import (
+    NewsTossChatbot,
     get_embedding_tokenizer,
     get_lda_model,
     get_summarize_model,
@@ -59,6 +60,13 @@ async def startup_event():
     app.state.stopwords = stopwords
 
     print("🟢 LDA 모델 로딩 완료")
+
+    print("🟡 LLM 모델 불러오는 중...")
+
+    chatbot = NewsTossChatbot()
+    app.state.chatbot = chatbot
+
+    print("🟢 LLM 모델 로딩 완료")
 
 
 # 라우터

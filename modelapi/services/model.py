@@ -4,6 +4,9 @@ from konlpy.tag import Okt
 import numpy as np
 
 from schemas.model import SimilarNewsItem
+import asyncio
+from fastapi.responses import StreamingResponse
+import json
 
 
 def get_news_summary(
@@ -222,3 +225,65 @@ def get_lda_topic(text, request):
         lda_topics[f"topic_{index+1}"] = value
 
     return lda_topics
+
+
+async def get_stream_response(request, payload):
+    chatbot = request.app.state.chatbot
+    loop = asyncio.get_event_loop()
+
+    prompt = await loop.run_in_executor(
+        None, chatbot.make_stream_prompt, payload.question, payload.top_k
+    )
+
+    client = chatbot.get_client()
+    stream = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.4,
+        max_tokens=1024,
+        stream=True,
+    )
+
+    queue = asyncio.Queue()
+
+    def produce_chunks():
+        buffer = ""
+        try:
+            for chunk in stream:
+                delta = chunk.choices[0].delta
+                content = getattr(delta, "content", None)
+                if content:
+                    buffer += content
+
+                    # 조건에 따라 전송
+                    if len(buffer) >= 3 or content.endswith((".", "!", "다", "요")):
+                        data = {
+                            "client_id": payload.client_id,
+                            "content": buffer,
+                        }
+                        msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                        asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
+                        buffer = ""
+        finally:
+            # 남은 내용 마지막으로 전송
+            if buffer:
+                data = {
+                    "client_id": payload.client_id,
+                    "content": buffer,
+                }
+                msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
+
+            # 종료 신호
+            asyncio.run_coroutine_threadsafe(queue.put(None), loop)
+
+    loop.run_in_executor(None, produce_chunks)
+
+    async def event_stream():
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            yield item
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")

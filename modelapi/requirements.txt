@@ -19,9 +19,9 @@ prometheus-fastapi-instrumentator
 prometheus-client
 
 # Database & ORM
-# sqlalchemy
-# psycopg2
-# pgvector
+sqlalchemy
+psycopg2-binary
+pgvector
 
 # dvc
 dvc[s3]
@@ -40,3 +40,9 @@ chromadb
 langchain
 langchain-community
 langchain-chroma
+
+# LLM API
+openai
+
+# HTTP
+requests

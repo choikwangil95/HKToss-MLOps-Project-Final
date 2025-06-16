@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request, Body
 from schemas.model import (
+    ChatIn,
+    ChatOut,
     LdaTopicsIn,
     LdaTopicsOut,
     SimilarNewsIn,
@@ -8,7 +10,14 @@ from schemas.model import (
 from services.model import (
     get_lda_topic,
     get_news_similar_list,
+    get_stream_response,
 )
+
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+import openai
+import os
+import json
 
 router = APIRouter(
     prefix="/news",
@@ -64,3 +73,13 @@ async def get_news_summary_router(request: Request, payload: LdaTopicsIn):
     lda_topics = get_lda_topic(article, request)
 
     return {"lda_topics": lda_topics}
+
+
+@router.post(
+    "/chat/stream",
+    # response_model=ChatOut,
+    summary="뉴스 GPT 챗봇",
+    description="뉴스 GPT 챗봇",
+)
+async def chat_stream_endpoint(request: Request, payload: ChatIn):
+    return await get_stream_response(request, payload)
