@@ -559,7 +559,6 @@ def fetch_latest_news():
                 log.info(
                     f"[NEW] {article['wdate']} - {article['title']} ({article['press']})"
                 )
-                log.info(f"{preview}...\n")
             except Exception as e:
                 log.error(f"본문 파싱 실패 ({type(e).__name__}): {e}")
     else:
@@ -1159,6 +1158,12 @@ class NewsMarketPipeline:
                         / self.df[d_minus_1_col],
                         2,
                     )
+
+            self.df["d_minus_1_date_close"] = 0
+            self.df["d_minus_1_date_volume"] = 0
+            self.df["d_minus_1_date_institution"] = 0
+            self.df["d_minus_1_date_foreign"] = 0
+            self.df["d_minus_1_date_individual"] = 0
 
             return self.df.to_dict(orient="records")
         except Exception as e:
