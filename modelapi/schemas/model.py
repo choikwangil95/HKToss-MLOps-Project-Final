@@ -63,7 +63,6 @@ class LdaTopicsOut(BaseModel):
 class ChatIn(BaseModel):
     client_id: str
     question: str
-    top_k: int = 5
 
 
 class ChatOut(BaseModel):

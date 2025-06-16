@@ -232,7 +232,7 @@ async def get_stream_response(request, payload):
     loop = asyncio.get_event_loop()
 
     prompt = await loop.run_in_executor(
-        None, chatbot.make_stream_prompt, payload.question, payload.top_k
+        None, chatbot.make_stream_prompt, payload.question, 5
     )
 
     client = chatbot.get_client()
@@ -247,34 +247,37 @@ async def get_stream_response(request, payload):
     queue = asyncio.Queue()
 
     def produce_chunks():
-        buffer = ""
+        full_buffer = ""  # 전체 누적
         try:
             for chunk in stream:
                 delta = chunk.choices[0].delta
                 content = getattr(delta, "content", None)
                 if content:
-                    buffer += content
+                    full_buffer += content
 
-                    # 조건에 따라 전송
-                    if len(buffer) >= 3 or content.endswith((".", "!", "다", "요")):
+                    # 중간 전송: 원하는 단위로 자르되 항상 is_last=False
+                    if len(full_buffer) >= 3 or content.endswith(
+                        (".", "!", "다", "요")
+                    ):
+                        partial, full_buffer = full_buffer, ""
                         data = {
                             "client_id": payload.client_id,
-                            "content": buffer,
+                            "content": partial,
+                            "is_last": False,
                         }
                         msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
                         asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
-                        buffer = ""
         finally:
-            # 남은 내용 마지막으로 전송
-            if buffer:
+            # 남은 것 마지막으로 전송
+            if full_buffer:
                 data = {
                     "client_id": payload.client_id,
-                    "content": buffer,
+                    "content": full_buffer,
+                    "is_last": True,  # ✅ 이게 진짜 마지막
                 }
                 msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
                 asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
 
-            # 종료 신호
             asyncio.run_coroutine_threadsafe(queue.put(None), loop)
 
     loop.run_in_executor(None, produce_chunks)
