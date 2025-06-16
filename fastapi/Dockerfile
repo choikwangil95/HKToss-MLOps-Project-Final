@@ -2,13 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 시스템 종속성 설치
+# 시스템 종속성 설치 (Faiss, numpy 등 빌드용)
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     build-essential \
     cmake \
-    libpq-dev \  
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

@@ -18,17 +18,20 @@ pydantic
 
 # Database & ORM
 sqlalchemy
-psycopg2
+psycopg2-binary
 pgvector
 
 # dvc
 dvc[s3]
 
-# DB 연결 및 ORM 라이브러리
-sqlalchemy>=1.4
-
-transformers
-sentence-transformers
+# Vector db
 faiss-cpu
-llama-cpp-python==0.2.78
-torch
+
+# LLM API
+openai
+
+# HTTP
+requests
+
+#Schema validation
+pydantic

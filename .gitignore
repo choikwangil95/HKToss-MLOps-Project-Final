@@ -183,6 +183,7 @@ cython_debug/
 # 모델 파일 제외
 /fastapi/ml_models/ko-sbert-sts_model.pk
 /models/guantized_llama3/llama-3-Korean-Bllossom-8B-Q4_K_M.gguf
+/db/news_vector_db.pkl
 
 # 뉴스 데이터 제외
 datas/mk_news_with_id.csv

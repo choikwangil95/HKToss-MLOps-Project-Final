@@ -10,11 +10,10 @@ services:
       - db
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
-      - MODEL_PATH=/app/models/quantized_llama3/llama-3-Korean-Bllossom-8B-Q4_K_M.gguf   # 라마모델 환경변수 추가해서 volume mount 하는 방식
+      - OPENAI_API_KEY=${OPENAI_API_KEY}  # .env 
     volumes:
       - ./fastapi:/fastapi
-      - ./models/quantized_llama3:/app/models/quantized_llama3
-      - ./db:/app/db  # 챗봇 - 벡터 DB 연결되면 삭제 예정
+      - ./db:/app/db  # 챗봇 - 벡터 DB (볼륨마운트))
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   # automation:

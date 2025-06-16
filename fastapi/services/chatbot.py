@@ -1,9 +1,7 @@
 from models.rag_pipeline import NewsTossChatbot
 
-# 싱글턴 인스턴스 (서버 시작 시 1회만 로딩)
-chatbot = NewsTossChatbot(
-    llm_model_path="../models/quantized_llama3/llama-3-Korean-Bllossom-8B-Q4_K_M.gguf"
-)
+# 싱글턴 객체로 관리 (여러 요청에서 재사용)
+chatbot = NewsTossChatbot()
 
-def get_chatbot_answer(question: str):
-    return chatbot.answer(question)
+def get_answer(question: str, top_k: int = 5) -> str:
+    return chatbot.answer(question, top_k=top_k)
