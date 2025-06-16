@@ -590,7 +590,7 @@ def extract_industries(stock_list, code_to_industry):
         stock_id = stock.get("stock_id")
         if stock_id is None:
             continue
-        industry = code_to_industry.get(stock_id)
+        industry = code_to_industry.get(int(stock_id))
         if industry:
             key = (stock_id, industry["industry_id"])
             if key not in seen:
