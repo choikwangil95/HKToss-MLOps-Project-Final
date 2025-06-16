@@ -134,8 +134,6 @@ def job(
 
     save_to_db(ner_news)
 
-    send_to_redis(ner_news)
-
     save_to_db_metadata(ner_news)
 
     # ──────────────────────────────
@@ -152,6 +150,17 @@ def job(
             save_to_db_external(market_datas)
 
             score_datas = get_impact_score(market_datas)
+
+            # ner_news에 score 추가
+            # 리스트 → 딕셔너리로 변환
+            score_map = {d["news_id"]: d["score"] for d in score_datas}
+
+            # ner_news에 score 추가
+            for item in ner_news:
+                news_id = item.get("news_id")
+                item["impact_score"] = score_map.get(news_id, 0.0)
+
+            send_to_redis(ner_news)
 
             update_db_impact_score(score_datas)
 

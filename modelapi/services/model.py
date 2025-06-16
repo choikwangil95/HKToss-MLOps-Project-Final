@@ -7,6 +7,8 @@ from schemas.model import SimilarNewsItem
 import asyncio
 from fastapi.responses import StreamingResponse
 import json
+import redis
+from concurrent.futures import ThreadPoolExecutor
 
 
 def get_news_summary(
@@ -227,10 +229,35 @@ def get_lda_topic(text, request):
     return lda_topics
 
 
+# ✅ 전역 Redis 연결 재사용
+redis_conn = redis.Redis(
+    host="43.200.17.139",
+    port=6379,
+    password="q1w2e3r4!@#",
+    decode_responses=True,
+)
+
+# ✅ 전역 ThreadPoolExecutor (스레드 재사용)
+redis_executor = ThreadPoolExecutor(max_workers=10)
+
+
+# ✅ Redis 비동기 전송 함수
+def send_to_redis_async(data: dict):
+    def task():
+        try:
+            redis_conn.publish("chat-response", json.dumps(data, ensure_ascii=False))
+        except Exception as e:
+            print(f"[Redis Error] {type(e).__name__}: {e}")
+
+    redis_executor.submit(task)
+
+
+# ✅ SSE 응답
 async def get_stream_response(request, payload):
     chatbot = request.app.state.chatbot
     loop = asyncio.get_event_loop()
 
+    # 프롬프트 생성 (동기 → 비동기)
     prompt = await loop.run_in_executor(
         None, chatbot.make_stream_prompt, payload.question, 5
     )
@@ -246,42 +273,58 @@ async def get_stream_response(request, payload):
 
     queue = asyncio.Queue()
 
-    def produce_chunks():
-        full_buffer = ""  # 전체 누적
+    def lookahead_iter(iterator):
+        """마지막 여부를 알려주는 제너레이터 (yield (is_last, item))"""
+        it = iter(iterator)
         try:
-            for chunk in stream:
+            prev = next(it)
+        except StopIteration:
+            return
+
+        for val in it:
+            yield False, prev
+            prev = val
+        yield True, prev  # 마지막
+
+    last_sent = False  # 마지막 true가 나갔는지 추적
+
+    def produce_chunks():
+        nonlocal last_sent
+        try:
+            for is_last, chunk in lookahead_iter(stream):
                 delta = chunk.choices[0].delta
                 content = getattr(delta, "content", None)
-                if content:
-                    full_buffer += content
 
-                    # 중간 전송: 원하는 단위로 자르되 항상 is_last=False
-                    if len(full_buffer) >= 3 or content.endswith(
-                        (".", "!", "다", "요")
-                    ):
-                        partial, full_buffer = full_buffer, ""
-                        data = {
-                            "client_id": payload.client_id,
-                            "content": partial,
-                            "is_last": False,
-                        }
-                        msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-                        asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
+                if content:
+                    data = {
+                        "client_id": payload.client_id,
+                        "content": content,
+                        "is_last": is_last,
+                    }
+                    if is_last:
+                        last_sent = True
+
+                    send_to_redis_async(data)
+                    msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                    asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
         finally:
-            # 남은 것 마지막으로 전송
-            if full_buffer:
+            # 혹시 마지막 is_last가 안 나갔으면 강제로 전송
+            if not last_sent:
                 data = {
                     "client_id": payload.client_id,
-                    "content": full_buffer,
-                    "is_last": True,  # ✅ 이게 진짜 마지막
+                    "content": "",  # 또는 None
+                    "is_last": True,
                 }
+                send_to_redis_async(data)
                 msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
                 asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
 
             asyncio.run_coroutine_threadsafe(queue.put(None), loop)
 
+    # 백그라운드로 실행
     loop.run_in_executor(None, produce_chunks)
 
+    # 비동기 스트림
     async def event_stream():
         while True:
             item = await queue.get()

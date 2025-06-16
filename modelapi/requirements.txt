@@ -46,3 +46,6 @@ openai
 
 # HTTP
 requests
+
+redis
+

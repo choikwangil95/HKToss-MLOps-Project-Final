@@ -835,6 +835,7 @@ def send_to_redis(news_data):
                 "press": news["press"],
                 "url": news["url"],
                 "image": news["image"],
+                "impact_score": news["impact_score"],
             }
             message = json.dumps(data, ensure_ascii=False)
             r.publish(channel, message)
