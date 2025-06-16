@@ -612,6 +612,9 @@ def extract_industries(stock_list, code_to_industry):
 
 
 def remove_market_related_sentences(text: str) -> str:
+    if not isinstance(text, str) or text.strip() == "":
+        return ""
+
     # 줄바꿈 제거
     text = text.replace("\n", " ")
 
@@ -625,7 +628,11 @@ def remove_market_related_sentences(text: str) -> str:
     text = re.sub(r"\b[\w.-]+@[\w.-]+\.\w+\b", "", text)
 
     # 문장 단위 분리 (간단하게 마침표 기준, 필요시 KSS 등 적용 가능)
-    sentences = split_sentences(text)
+    try:
+        sentences = split_sentences(text)
+    except Exception as e:
+        print(f"[❗KSS 오류] 문장 분리 실패: {e}")
+        sentences = text.split(". ")
 
     # 제거할 패턴들 (뉴스 문장에서 자주 등장하는 패턴)
     patterns = [
