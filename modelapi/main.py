@@ -6,6 +6,7 @@ from load_models import (
     get_summarize_model,
     get_ner_tokenizer,
     get_vectordb,
+    get_prediction_models,
 )
 from monitoring import instrumentator
 
@@ -57,8 +58,19 @@ async def startup_event():
     app.state.lda_model = lda_model
     app.state.count_vectorizer = count_vectorizer
     app.state.stopwords = stopwords
-
+    
     print("🟢 LDA 모델 로딩 완료")
+
+    print("🟡 예측 모델 불러오는 중...")
+
+    predictor, target_scaler, group_scalers = get_prediction_models()
+    app.state.predictor = predictor
+    app.state.target_scaler = target_scaler
+    app.state.group_scalers = group_scalers
+
+    print("🟢 예측 모델 로딩 완료")
+
+
 
 
 # 라우터
