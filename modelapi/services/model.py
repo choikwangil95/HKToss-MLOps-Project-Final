@@ -311,6 +311,7 @@ async def get_stream_response(request, payload):
 
     def produce_chunks():
         nonlocal last_sent
+        idx = 0  # 인덱스 추가
         try:
             for is_last, chunk in lookahead_iter(stream):
                 delta = chunk.choices[0].delta
@@ -321,7 +322,9 @@ async def get_stream_response(request, payload):
                         "client_id": payload.client_id,
                         "content": content,
                         "is_last": is_last,
+                        "index": idx,  # 인덱스 부여
                     }
+                    idx += 1  # 인덱스 증가
                     if is_last:
                         last_sent = True
 
@@ -335,6 +338,7 @@ async def get_stream_response(request, payload):
                     "client_id": payload.client_id,
                     "content": "",  # 또는 None
                     "is_last": True,
+                    "index": idx,  # 마지막 인덱스
                 }
                 send_to_redis_async(data)
                 msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"

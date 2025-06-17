@@ -156,11 +156,11 @@ class NewsTossChatbot:
         for similar_news_item in similar_news:
             row = similar_news_item
             info = (
-                # f"[{row['wdate']}] {row['press']} - {row['title']}\n"
-                # f"URL: {row['url']}\n"
-                f"[{row['wdate']}]\n"
-                f"{row['summary']}\n"
-                f"(코사인유사도: {row['score']:.4f})"
+                f"제목: {row['title']}\n"
+                f"날짜: {row['wdate']}\n"
+                f"요약: {row['summary']}\n"
+                f"기사 URL: {row['url']}\n"
+                f"이미지: {row['image']}\n"
             )
             retrieved_infos.append(info)
         context = "\n\n".join(retrieved_infos)
