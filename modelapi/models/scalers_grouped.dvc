@@ -1,0 +1,6 @@
+outs:
+- md5: af15405db3444d7e3755b3b80a2bb532.dir
+  size: 17058
+  nfiles: 14
+  hash: md5
+  path: scalers_grouped
