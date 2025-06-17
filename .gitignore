@@ -196,3 +196,9 @@ db/news_v2_vector_202506122113.csv
 
 # 뉴스 데이터 제외
 datas/mk_news_with_id.csv
+
+# 모델 4개
+/scalers_grouped
+/tokenizer_dir
+/ae_encoder.onnx
+/regressor_model.onnx

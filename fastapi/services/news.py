@@ -453,6 +453,8 @@ def find_news_similar_v2(
                 )
             )
 
+    # 정밀 유사 뉴스 API 호출
+    
     # 유사도 높은 순 정렬
     output.sort(key=lambda x: x.similarity, reverse=True)
 
