@@ -73,3 +73,23 @@ class ChatIn(BaseModel):
 class ChatOut(BaseModel):
     client_id: str
     answer: str
+
+# 요청: 단일 뉴스 ID 입력
+class SimilarityRequest(BaseModel):
+    news_id: str  # 사용자가 입력하는 값
+    news_topk_ids: Optional[List[str]] = Field(
+        default=None,
+        description="기준 뉴스와 유사한 뉴스 ID 목록 (최대 10개)",
+    )
+
+# 응답: 유사 뉴스 5개에 대한 유사도 예측 점수 및 랭킹
+class SimilarityResult(BaseModel):
+    news_id: str
+    summary: str
+    score: float
+    rank: int
+
+# 응답 모델: 유사도 예측 결과를 포함하는 리스트
+class SimilarityResponse(BaseModel):
+    results: List[SimilarityResult]
+

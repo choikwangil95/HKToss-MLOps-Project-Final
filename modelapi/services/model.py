@@ -2,6 +2,7 @@ import numpy as np
 import re
 from konlpy.tag import Okt
 import numpy as np
+from sqlalchemy.orm import Session
 
 from schemas.model import SimilarNewsItem
 import asyncio
@@ -358,3 +359,60 @@ async def get_stream_response(request, payload):
             yield item
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# AE 인코딩 함수
+def run_ae(ae_sess, embedding):
+    input_name = ae_sess.get_inputs()[0].name
+    output_name = ae_sess.get_outputs()[0].name
+    return ae_sess.run([output_name], {input_name: embedding.astype(np.float32)})[0]
+
+# 스케일링 함수
+def scale_ext(ext, prefix, scalers):
+    return np.array([
+        scalers.get(f'{prefix}_{i}', None).transform([[val]])[0][0] if f'{prefix}_{i}' in scalers else val
+        for i, val in enumerate(ext)
+    ], dtype=np.float32)
+
+# 회귀 모델 기반 유사도 계산 함수 (다양한 방식에 대응할 수 있도록 수정)
+def compute_similarity_scores_from_news_id(
+    db: Session,
+    summary: str,
+    extA: list,
+    similar_summaries: list,
+    extBs: list,
+    scalers,
+    ae_sess,
+    regressor_sess,
+    embedding_api_func
+):
+    # 텍스트 임베딩
+    all_texts = [summary] + similar_summaries
+    embeddings = embedding_api_func(all_texts)
+    embA, embBs = embeddings[0], embeddings[1:]
+
+    # AE 인코딩
+    latentA = run_ae(ae_sess, embA.reshape(1, -1))[0]
+    latentBs = [run_ae(ae_sess, e.reshape(1, -1))[0] for e in embBs]
+
+    # 스케일링
+    extA_scaled = scale_ext(extA, 'extA', scalers)
+    extBs_scaled = [scale_ext(extB, 'extB_similar', scalers) for extB in extBs]
+
+    # 회귀 예측
+    input_name = regressor_sess.get_inputs()[0].name
+    output_name = regressor_sess.get_outputs()[0].name
+
+    scores = []
+    for latentB, extB_scaled in zip(latentBs, extBs_scaled):
+        featA = np.concatenate([latentA, extA_scaled])
+        featB = np.concatenate([latentB, extB_scaled])
+        input_vec = np.concatenate([featA, featB]).reshape(1, -1).astype(np.float32)
+        score = regressor_sess.run([output_name], {input_name: input_vec})[0][0][0]
+        scores.append(score)
+
+    # 결과 반환
+    return [
+        {'summary': summ, 'score': float(score), 'rank': i+1}
+        for i, (summ, score) in enumerate(zip(similar_summaries, scores))
+    ]

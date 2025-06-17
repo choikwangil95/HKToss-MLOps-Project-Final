@@ -4,6 +4,7 @@ from load_models import (
     NewsTossChatbot,
     get_embedding_tokenizer,
     get_lda_model,
+    get_similarity_model,
     get_summarize_model,
     get_ner_tokenizer,
     get_vectordb,
@@ -71,6 +72,11 @@ async def startup_event():
     app.state.chatbot = chatbot
 
     logger.info("🟢 LLM 모델 로딩 완료")
+
+    print("🟡 LLM 모델 불러오는 중...")
+
+    # Regressor 모델 및 스케일러 불러오기
+    scalers, ae_sess, regressor_sess, tokenizer = get_similarity_model()
 
 
 # 라우터
