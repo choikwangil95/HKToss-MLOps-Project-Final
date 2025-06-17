@@ -73,3 +73,12 @@ class ChatIn(BaseModel):
 class ChatOut(BaseModel):
     client_id: str
     answer: str
+
+
+class RecommendIn(BaseModel):
+    news_clicked_list: List
+    news_candidate_list: List
+
+
+class RecommendOut(BaseModel):
+    news_recommended: List

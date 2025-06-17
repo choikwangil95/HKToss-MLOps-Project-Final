@@ -354,3 +354,26 @@ async def get_stream_response(request, payload):
             yield item
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+def get_news_recommended(payload, request):
+    """
+    뉴스 본문을 임베딩하는 함수입니다.
+    """
+    news_clicked_list = payload.news_clicked_list
+    news_candidate_list = payload.news_candidate_list
+
+    model_recommend = request.app.state.model_recommend
+
+    # 추론
+    outputs = model_recommend.run(
+        None,
+        {"clicked": news_clicked_list, "candidates": news_candidate_list},
+    )
+
+    scores = outputs[0]  # [1, 5]
+    top_1 = scores[0].argsort()[::-1][:1][0]  # Top-1 추천 인덱스
+
+    # 예측 결과 (Top-3 후보 인덱스):
+    # [14  0  2 16 19 13 15  1 10  7  9  4 17  5  8  3  6 18 11 12]
+    return top_1

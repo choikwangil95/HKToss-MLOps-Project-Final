@@ -4,6 +4,7 @@ from load_models import (
     NewsTossChatbot,
     get_embedding_tokenizer,
     get_lda_model,
+    get_recommend_model,
     get_summarize_model,
     get_ner_tokenizer,
     get_vectordb,
@@ -71,6 +72,13 @@ async def startup_event():
     app.state.chatbot = chatbot
 
     logger.info("🟢 LLM 모델 로딩 완료")
+
+    logger.info("🟡 뉴스 추천 모델 불러오는 중...")
+
+    model_recommend = get_recommend_model()
+    app.state.model_recommend = model_recommend
+
+    logger.info("🟢 뉴스 모델 로딩 완료")
 
 
 # 라우터
