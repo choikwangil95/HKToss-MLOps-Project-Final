@@ -201,4 +201,4 @@ datas/mk_news_with_id.csv
 /scalers_grouped
 /tokenizer_dir
 /ae_encoder.onnx
-/regressor_model.onnx
+/regressor_model.onnxautomation/models/
