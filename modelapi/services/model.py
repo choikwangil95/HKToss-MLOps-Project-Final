@@ -206,7 +206,7 @@ def get_news_similar_list(payload, request):
                 image=image,
                 stock_list=stock_list,
                 industry_list=industry_list,
-                impact_score=round(1 - float(score), 2),
+                similarity=round(1 - float(score), 2),
             )
         )
 

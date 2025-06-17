@@ -50,7 +50,7 @@ class SimilarNewsItem(BaseModel):
     image: Optional[str] = None
     stock_list: Optional[List[str]] = []
     industry_list: Optional[List[str]] = []
-    impact_score: float
+    similarity: float
 
 
 class SimilarNewsOut(BaseModel):

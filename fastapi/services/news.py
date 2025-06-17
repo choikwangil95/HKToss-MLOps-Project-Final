@@ -414,7 +414,7 @@ def find_news_similar_v2(
     summary_map = {
         item["news_id"]: {
             "summary": item["summary"],
-            "impact_score": item["impact_score"],
+            "similarity": item["similarity"],
         }
         for item in similar_news_list
     }
@@ -449,7 +449,7 @@ def find_news_similar_v2(
                     url=row.url,
                     image=row.image,
                     summary=meta["summary"],
-                    similarity=round(meta["impact_score"], 3),
+                    similarity=round(meta["similarity"], 3),
                 )
             )
 
