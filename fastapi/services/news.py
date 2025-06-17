@@ -10,7 +10,6 @@ from models.news import (
     ReportModel,
 )
 from schemas.news import News, NewsOut_v2_External, SimilarNewsV2
-from datetime import timedelta
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 import numpy as np
@@ -19,8 +18,8 @@ import datetime
 import json
 import ast
 from fastapi import HTTPException
-from datetime import datetime
 import requests
+from datetime import datetime, timedelta
 
 
 def get_news_list(
@@ -478,3 +477,31 @@ def find_news_similar_v2(
             break
 
     return filtered_output
+
+
+def get_news_recommended(user_id, db):
+
+    # 날짜 범위 설정
+    end_datetime = datetime.now().replace(
+        hour=23, minute=59, second=59, microsecond=999999
+    )
+    start_datetime = (end_datetime - timedelta(days=7)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+    # 후보 뉴스 = 최신 주요 뉴스
+    top_news = get_top_impact_news(
+        db=db,
+        start_datetime=start_datetime,
+        end_datetime=end_datetime,
+        limit=20,
+        stock_list=None,
+    )
+
+    # 유저 뉴스 로그 가져오기
+
+    # 추천 모델 호출하기
+
+    # 추천 뉴스 리턴하기
+
+    return top_news

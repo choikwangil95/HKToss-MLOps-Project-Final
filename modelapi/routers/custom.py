@@ -4,11 +4,14 @@ from schemas.model import (
     ChatOut,
     LdaTopicsIn,
     LdaTopicsOut,
+    RecommendIn,
+    RecommendOut,
     SimilarNewsIn,
     SimilarNewsOut,
 )
 from services.model import (
     get_lda_topic,
+    get_news_recommended,
     get_news_similar_list,
     get_stream_response,
 )
@@ -83,3 +86,19 @@ async def get_news_summary_router(request: Request, payload: LdaTopicsIn):
 )
 async def chat_stream_endpoint(request: Request, payload: ChatIn):
     return await get_stream_response(request, payload)
+
+
+@router.post(
+    "/recommend",
+    response_model=RecommendOut,
+    summary="뉴스 맞춤 추천",
+    description="뉴스 맞춤 추천",
+)
+async def get_news_summary_router(request: Request, payload: RecommendIn):
+    """
+    뉴스 맞춤 추천
+    """
+
+    news_recomended = get_news_recommended(payload, request)
+
+    return {"news_recomended": news_recomended}

@@ -9,6 +9,7 @@ import os
 import requests
 import openai
 from dotenv import load_dotenv
+import onnxruntime as ort
 
 load_dotenv()
 
@@ -197,3 +198,14 @@ class NewsTossChatbot:
         )
 
         return response.choices[0].message.content
+
+
+def get_recommend_model():
+    model_base_path = Path("models")
+
+    # ONNX 세션 생성
+    model_recommend = ort.InferenceSession(
+        str(model_base_path / "two_tower_model.onnx")
+    )
+
+    return model_recommend
