@@ -76,7 +76,13 @@ async def startup_event():
     print("🟡 LLM 모델 불러오는 중...")
 
     # Regressor 모델 및 스케일러 불러오기
-    scalers, ae_sess, regressor_sess, tokenizer = get_similarity_model()
+    print("🟡 [STARTUP] Similarity 모델 로딩 중...")
+    scalers, ae_sess, regressor_sess, embedding_api_url = get_similarity_model()
+    app.state.scalers = scalers
+    app.state.ae_sess = ae_sess
+    app.state.regressor_sess = regressor_sess
+    app.state.embedding_api_url = embedding_api_url
+    print("🟢 [DONE] Similarity 모델 로딩 완료")
 
 
 # 라우터

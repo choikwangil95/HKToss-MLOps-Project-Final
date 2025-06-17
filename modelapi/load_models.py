@@ -9,7 +9,6 @@ import os
 import requests
 import openai
 from dotenv import load_dotenv
-from transformers import AutoTokenizer
 import pickle
 
 load_dotenv()
@@ -181,25 +180,28 @@ class NewsTossChatbot:
         return response.choices[0].message.content
 
 
-# 스케일러 로더: 각 pkl 파일을 딕셔너리로 읽어 들여서, 스케일링 시 변수명을 기준으로 접근할 수 있게 구성
+# 스케일러 로더: 각 파일을 딕셔너리로 읽어 들여서, 스케일링 시 변수명을 기준으로 접근할 수 있게 구성
 def load_scalers_by_group(folder_path):
     scalers = {}
 
     for filename in os.listdir(folder_path):
-        if filename.endswith('.pkl'):
-            key = filename.replace('.pkl', '')
+        if filename.endswith('.joblib'):
+            key = filename.replace('.joblib', '')
             full_path = os.path.join(folder_path, filename)
-            with open(full_path, 'rb') as f:
-                scalers[key] = pickle.load(f)
+            obj = joblib.load(full_path)
+
+            # 버전 정보 포함된 dict일 경우 대응
+            if isinstance(obj, dict) and 'scaler' in obj:
+                scalers[key] = obj['scaler']
+            else:
+                scalers[key] = obj
 
     return scalers
 
 # 과거 유사 뉴스 검색을 위한 모델 로딩 함수
 def get_similarity_model():
     model_dir = 'models/'
-    tokenizer_path = os.path.join(model_dir, 'tokenizer_dir')
     scaler_dir = os.path.join(model_dir, 'scalers_grouped')
-
     ae_path = os.path.join(model_dir, 'ae_encoder.onnx')
     regressor_path = os.path.join(model_dir, 'regressor_model.onnx')
 
@@ -210,7 +212,7 @@ def get_similarity_model():
     # 스케일러 로딩
     scalers = load_scalers_by_group(scaler_dir)
 
-    # 토크나이저 로딩
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    # tokenizer는 이제 사용하지 않음 → 대신 embedding API URL 저장
+    embedding_api_url = "http://15.165.211.100:8000/plm/embedding"
 
-    return scalers, ae_sess, regressor_sess, tokenizer
+    return scalers, ae_sess, regressor_sess, embedding_api_url

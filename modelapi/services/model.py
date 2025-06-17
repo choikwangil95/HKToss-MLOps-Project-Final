@@ -375,12 +375,12 @@ def scale_ext(ext, prefix, scalers):
     ], dtype=np.float32)
 
 # 회귀 모델 기반 유사도 계산 함수 (다양한 방식에 대응할 수 있도록 수정)
-def compute_similarity_scores_from_news_id(
+def compute_similarity(
     db: Session,
     summary: str,
-    extA: list,
+    extA_total: list,
     similar_summaries: list,
-    extBs: list,
+    extB_total: list,
     scalers,
     ae_sess,
     regressor_sess,
@@ -396,8 +396,8 @@ def compute_similarity_scores_from_news_id(
     latentBs = [run_ae(ae_sess, e.reshape(1, -1))[0] for e in embBs]
 
     # 스케일링
-    extA_scaled = scale_ext(extA, 'extA', scalers)
-    extBs_scaled = [scale_ext(extB, 'extB_similar', scalers) for extB in extBs]
+    extA_scaled = scale_ext(extA_total, 'extA', scalers)
+    extBs_scaled = [scale_ext(extB_total, 'extB_similar', scalers) for extB in extBs]
 
     # 회귀 예측
     input_name = regressor_sess.get_inputs()[0].name
