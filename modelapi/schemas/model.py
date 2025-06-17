@@ -43,9 +43,14 @@ class SimilarNewsIn(BaseModel):
 
 class SimilarNewsItem(BaseModel):
     news_id: str
-    summary: str
     wdate: str
-    score: float
+    title: str
+    summary: str
+    url: Optional[str] = None
+    image: Optional[str] = None
+    stock_list: Optional[List[str]] = []
+    industry_list: Optional[List[str]] = []
+    impact_score: float
 
 
 class SimilarNewsOut(BaseModel):

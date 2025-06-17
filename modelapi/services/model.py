@@ -10,6 +10,8 @@ import json
 import redis
 from concurrent.futures import ThreadPoolExecutor
 
+import ast
+
 
 def get_news_summary(
     text,
@@ -159,6 +161,15 @@ def get_news_embedding(text, request):
     return [[float(x) for x in embedding[0]]]
 
 
+def safe_parse_list(val):
+    if isinstance(val, str):
+        try:
+            return ast.literal_eval(val)
+        except Exception:
+            return []
+    return val if isinstance(val, list) else []
+
+
 def get_news_similar_list(payload, request):
     """
     유사 뉴스 top_k
@@ -175,7 +186,12 @@ def get_news_similar_list(payload, request):
     for doc, score in results:
         news_id = doc.metadata.get("news_id")
         wdate = doc.metadata.get("wdate")
+        title = doc.metadata.get("title")
         summary = doc.page_content
+        url = doc.metadata.get("url")
+        image = doc.metadata.get("image")
+        stock_list = safe_parse_list(doc.metadata.get("stock_list"))
+        industry_list = safe_parse_list(doc.metadata.get("industry_list"))
 
         if not news_id or not wdate or not summary:
             continue
@@ -183,9 +199,14 @@ def get_news_similar_list(payload, request):
         news_similar_list.append(
             SimilarNewsItem(
                 news_id=news_id,
-                summary=summary,
                 wdate=wdate,
-                score=round(1 - float(score), 2),
+                title=title,
+                summary=summary,
+                url=url,
+                image=image,
+                stock_list=stock_list,
+                industry_list=industry_list,
+                impact_score=round(1 - float(score), 2),
             )
         )
 
