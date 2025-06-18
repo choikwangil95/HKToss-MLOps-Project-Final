@@ -16,6 +16,7 @@ from services.model import (
     get_stream_response,
     compute_similarity
 )
+import requests
 
 
 from pydantic import BaseModel
@@ -26,7 +27,7 @@ from load_models import get_similarity_model
 import asyncio
 from sqlalchemy.orm import Session
 from db.postgresql import get_db
-from models.custom import NewsModel_v2, NewsModel_v2_External, NewsModel_v2_Topic
+from models.custom import NewsModel_v2_Metadata, NewsModel_v2_External, NewsModel_v2_Topic
 
 
 router = APIRouter(
@@ -106,65 +107,98 @@ async def get_similarity_scores(request: Request, payload: SimilarityRequest, db
     scalers = request.app.state.scalers
     ae_sess = request.app.state.ae_sess
     regressor_sess = request.app.state.regressor_sess
-    embedding_api_func = lambda texts: requests.post(
-        request.app.state.embedding_api_url,
-        json={'texts': texts}
-    ).json()['embeddings']  # 임베딩 API로 POST 요청
+    
+    def embedding_api_func(texts):
+        embeddings = []
+        for text in texts:
+            res = requests.post(
+                request.app.state.embedding_api_url,
+                json={'article': text}  # 단일 문자열
+            )
+
+            print('🟡 응답 상태:', res.status_code)
+            print('🟡 응답 본문:', res.text)
+
+            try:
+                data = res.json()
+            except Exception as e:
+                print('🔴 JSON 파싱 실패:', str(e))
+                raise HTTPException(status_code=500, detail='임베딩 API 응답이 JSON 형식이 아닙니다.')
+
+            if 'embedding' not in data:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"임베딩 API 응답에 'embedding' 키가 없습니다. 응답 내용: {data}"
+                )
+
+            embeddings.append(data['embedding'][0])  # 보통 [[...]] 형태이므로 [0]으로 접근
+
+            print('🟡 임베딩 결과:', embeddings)
+
+        return embeddings
+
 
     news_id = payload.news_id
     news_topk_ids = payload.news_topk_ids or []
 
+    # 공통 외부변수 컬럼 정의 (news_id 제외 전부)
+    ext_cols = [col.name for col in NewsModel_v2_External.__table__.columns if col.name != 'news_id']
+
     # 기준 뉴스 정보 조회
-    ref_news_raw = db.query(NewsModel_v2).filter(NewsModel_v2.news_id == news_id).first()
+    ref_news_raw = db.query(NewsModel_v2_Metadata).filter(
+        NewsModel_v2_Metadata.news_id == news_id
+    ).first()
     if not ref_news_raw:
         raise HTTPException(status_code=404, detail="기준 뉴스 정보를 찾을 수 없습니다.")
     summary = ref_news_raw.summary
 
-    ref_news_external = db.query(NewsModel_v2_External).filter(NewsModel_v2_External.news_id == news_id).first()
+    ref_news_external = db.query(NewsModel_v2_External).filter(
+        NewsModel_v2_External.news_id == news_id
+    ).first()
     if not ref_news_external:
         raise HTTPException(status_code=404, detail="기준 뉴스 외부 변수 정보를 찾을 수 없습니다.")
+    extA = [getattr(ref_news_external, col) for col in ext_cols]
 
-    extA_cols = [col.name for col in ref_news_external.__table__.columns if col.name.startswith('extA_')]
-    extA = [getattr(ref_news_external, col) for col in extA_cols]
-
-    ref_news_topic = db.query(NewsModel_v2_Topic).filter(NewsModel_v2_Topic.news_id == news_id).first()
+    ref_news_topic = db.query(NewsModel_v2_Topic).filter(
+        NewsModel_v2_Topic.news_id == news_id
+    ).first()
     if not ref_news_topic:
         raise HTTPException(status_code=404, detail="기준 뉴스 토픽 정보를 찾을 수 없습니다.")
-
     topic_cols = [col.name for col in ref_news_topic.__table__.columns if col.name.startswith('topic_')]
     topicA = [getattr(ref_news_topic, col) for col in topic_cols]
 
     extA_total = extA + topicA
 
     # 유사 뉴스 정보 조회
-    topk_news_raw = db.query(NewsModel_v2).filter(NewsModel_v2.news_id.in_(news_topk_ids)).all()
+    topk_news_raw = db.query(NewsModel_v2_Metadata).filter(
+        NewsModel_v2_Metadata.news_id.in_(news_topk_ids)
+    ).all()
     summary_map = {news.news_id: news.summary for news in topk_news_raw}
     try:
         similar_summaries = [summary_map[nid] for nid in news_topk_ids]
     except KeyError as e:
         raise HTTPException(status_code=400, detail=f"유사 뉴스 ID {str(e)}가 DB에 존재하지 않습니다.")
 
-    topk_exts = db.query(NewsModel_v2_External).filter(NewsModel_v2_External.news_id.in_(news_topk_ids)).all()
+    topk_exts = db.query(NewsModel_v2_External).filter(
+        NewsModel_v2_External.news_id.in_(news_topk_ids)
+    ).all()
     ext_map = {ext.news_id: ext for ext in topk_exts}
-
-    extB_cols = [col.name for col in NewsModel_v2_External.__table__.columns if col.name.startswith('extB_similar_')]
     extBs = [
-        [getattr(ext_map[nid], col) for col in extB_cols]
+        [getattr(ext_map[nid], col) for col in ext_cols]
         for nid in news_topk_ids
     ]
 
-    topk_topics = db.query(NewsModel_v2_Topic).filter(NewsModel_v2_Topic.news_id.in_(news_topk_ids)).all()
+    topk_topics = db.query(NewsModel_v2_Topic).filter(
+        NewsModel_v2_Topic.news_id.in_(news_topk_ids)
+    ).all()
     topic_map = {topic.news_id: topic for topic in topk_topics}
-
-    topicB_cols = [col.name for col in NewsModel_v2_Topic.__table__.columns if col.name.startswith('similar_topic_')]
+    topicB_cols = [col.name for col in NewsModel_v2_Topic.__table__.columns if col.name.startswith('topic_')]
     topicBs = [
         [getattr(topic_map[nid], col) for col in topicB_cols]
         for nid in news_topk_ids
     ]
 
-    extB_total = [
-        ext + topic for ext, topic in zip(extBs, topicBs)
-    ]
+    extB_total = [ext + topic for ext, topic in zip(extBs, topicBs)]
 
     missing_ext_ids = [nid for nid in news_topk_ids if nid not in ext_map]
     missing_topic_ids = [nid for nid in news_topk_ids if nid not in topic_map]
@@ -176,14 +210,20 @@ async def get_similarity_scores(request: Request, payload: SimilarityRequest, db
 
     # 유사도 점수 계산
     results = compute_similarity(
-         summary,
-         similar_summaries,
-         extA_total,
-         extB_total,
-         scalers,
-         ae_sess,
-         regressor_sess,
-         embedding_api_func
+        db=db,
+        summary=summary,
+        extA=extA,
+        topicA=topicA,
+        similar_summaries=similar_summaries,
+        extBs=extBs,
+        topicBs=topicBs,
+        scalers=scalers,
+        ae_sess=ae_sess,
+        regressor_sess=regressor_sess,
+        embedding_api_func=embedding_api_func,
+        ext_col_names=ext_cols,
+        topic_col_names=topic_cols,
+        news_topk_ids=news_topk_ids       
     )
 
     # news_id 매핑
