@@ -113,6 +113,28 @@ def get_lda_model():
 
     return lda_model, count_vectorizer, stopwords
 
+def get_prediction_models():
+    """
+    예측 모델과 스케일러 로딩
+    """
+    model_base_path = Path("models/saved_models")
+
+    # ONNX 추론 세션 생성
+    sess = ort.InferenceSession(
+        str(model_base_path / "predictor.onnx"),
+        providers=['CPUExecutionProvider']
+    )
+    
+    # 타겟 스케일러 로드
+    target_scaler = joblib.load(str(model_base_path / "target_scaler.joblib"))
+    
+    # 그룹별 스케일러 동적 로딩
+    fitted_scalers = {
+        i: joblib.load(str(model_base_path / f"scaler_group_{i}.joblib"))
+        for i in range(9)
+    }
+
+    return sess, target_scaler, fitted_scalers
 
 class NewsTossChatbot:
     def __init__(self):
