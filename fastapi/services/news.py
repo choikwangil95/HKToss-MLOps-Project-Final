@@ -410,18 +410,26 @@ def find_news_similar_v2(
         return []
 
     similar_news_ids = [item["news_id"] for item in similar_news_list]
+    filtered_ids = [nid for nid in similar_news_ids if nid != news_id]
+
+    print(ref_news_raw.news_id, filtered_ids)
 
     # 유사 뉴스 Rerank API 호출
     try:
         response = requests.post(
             "http://15.165.211.100:8000/news/similarity",
-            json={"news_id": ref_news_raw.news_id, "news_topk_ids": similar_news_ids},
+            json={
+                "news_id": ref_news_raw.news_id,
+                "news_topk_ids": filtered_ids,
+            },
         )
         response.raise_for_status()
         similar_news_reranked_list = response.json()["results"]
     except Exception as e:
-        print(f"❌ 유사 뉴스 API 요청 실패: {e}")
+        print(f"❌ 유사 뉴스 Rerank API 요청 실패: {e}")
         return []
+
+    print(similar_news_reranked_list)
 
     # 유사 뉴스 요약 맵
     summary_map = {

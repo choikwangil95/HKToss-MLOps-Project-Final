@@ -138,8 +138,6 @@ async def get_similarity_scores(
     async def embedding_api_func(texts):
         embeddings = await get_news_embeddings(texts, request)
 
-        print("🟡 임베딩 결과:", embeddings)
-
         return embeddings
 
     news_id = payload.news_id

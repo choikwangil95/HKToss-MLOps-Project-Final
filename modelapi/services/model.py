@@ -195,7 +195,7 @@ def get_news_similar_list(payload, request):
     vectordb = request.app.state.vectordb
 
     # 검색
-    results = vectordb.similarity_search_with_score(article, k=100)[:top_k]
+    results = vectordb.similarity_search_with_score(article, k=100)
 
     news_similar_list = []
     seen_titles = set()
@@ -234,7 +234,7 @@ def get_news_similar_list(payload, request):
             )
         )
 
-    return news_similar_list
+    return news_similar_list[:top_k]
 
 
 def get_lda_topic(text, request):
@@ -390,14 +390,17 @@ def run_ae(ae_sess, embedding):
     output_name = ae_sess.get_outputs()[0].name
     return ae_sess.run([output_name], {input_name: embedding.astype(np.float32)})[0]
 
+
 # 그룹 단위 스케일링 함수 (그룹별 scaler 적용)
-def scale_ext_grouped(ext: list, col_names: list, prefix: str, scalers: dict, group_key_map: dict):
+def scale_ext_grouped(
+    ext: list, col_names: list, prefix: str, scalers: dict, group_key_map: dict
+):
     grouped_data = {}
     grouped_indices = {}
     for idx, (col, val) in enumerate(zip(col_names, ext)):
         group = group_key_map.get(col, None)
         if group:
-            key = f'{prefix}_{group}'
+            key = f"{prefix}_{group}"
             grouped_data.setdefault(key, []).append(val)
             grouped_indices.setdefault(key, []).append(idx)
 
@@ -410,12 +413,13 @@ def scale_ext_grouped(ext: list, col_names: list, prefix: str, scalers: dict, gr
                 for idx, val in zip(grouped_indices[key], transformed):
                     scaled[idx] = val
             except Exception as e:
-                print(f'❌ {key} 스케일 실패: {e}')
+                print(f"❌ {key} 스케일 실패: {e}")
                 raise
         else:
-            print(f'⚠️ {key} 스케일러 없음 → 원본 사용')
+            print(f"⚠️ {key} 스케일러 없음 → 원본 사용")
 
     return np.array(scaled, dtype=np.float32)
+
 
 # 회귀 기반 유사 뉴스 유사도 계산 함수
 async def compute_similarity(
@@ -432,43 +436,43 @@ async def compute_similarity(
     embedding_api_func,
     ext_col_names: list,
     topic_col_names: list,
-    news_topk_ids: list
+    news_topk_ids: list,
 ):
-    
+
     # group_key_map 생성 (기준 + 유사 뉴스)
     group_key_map = {}
     for col in ext_col_names + topic_col_names:
-        if 'date_close' in col:
-            group_key_map[col] = 'price_close'
-        elif 'date_volume' in col:
-            group_key_map[col] = 'volume'
-        elif 'date_foreign' in col:
-            group_key_map[col] = 'foreign'
-        elif 'date_institution' in col:
-            group_key_map[col] = 'institution'
-        elif 'date_individual' in col:
-            group_key_map[col] = 'individual'
-        elif col in ['fx', 'bond10y', 'base_rate']:
-            group_key_map[col] = 'macro'
-        elif '토픽' in col:
-            group_key_map[col] = 'topic'
+        if "date_close" in col:
+            group_key_map[col] = "price_close"
+        elif "date_volume" in col:
+            group_key_map[col] = "volume"
+        elif "date_foreign" in col:
+            group_key_map[col] = "foreign"
+        elif "date_institution" in col:
+            group_key_map[col] = "institution"
+        elif "date_individual" in col:
+            group_key_map[col] = "individual"
+        elif col in ["fx", "bond10y", "base_rate"]:
+            group_key_map[col] = "macro"
+        elif "토픽" in col:
+            group_key_map[col] = "topic"
 
     for col in ext_col_names + topic_col_names:
-        col_sim = f'similar_{col}'
-        if 'date_close' in col:
-            group_key_map[col_sim] = 'price_close'
-        elif 'date_volume' in col:
-            group_key_map[col_sim] = 'volume'
-        elif 'date_foreign' in col:
-            group_key_map[col_sim] = 'foreign'
-        elif 'date_institution' in col:
-            group_key_map[col_sim] = 'institution'
-        elif 'date_individual' in col:
-            group_key_map[col_sim] = 'individual'
-        elif col in ['fx', 'bond10y', 'base_rate']:
-            group_key_map[col_sim] = 'macro'
-        elif '토픽' in col:
-            group_key_map[col_sim] = 'topic'
+        col_sim = f"similar_{col}"
+        if "date_close" in col:
+            group_key_map[col_sim] = "price_close"
+        elif "date_volume" in col:
+            group_key_map[col_sim] = "volume"
+        elif "date_foreign" in col:
+            group_key_map[col_sim] = "foreign"
+        elif "date_institution" in col:
+            group_key_map[col_sim] = "institution"
+        elif "date_individual" in col:
+            group_key_map[col_sim] = "individual"
+        elif col in ["fx", "bond10y", "base_rate"]:
+            group_key_map[col_sim] = "macro"
+        elif "토픽" in col:
+            group_key_map[col_sim] = "topic"
 
     # 텍스트 임베딩 + AE 인코딩
     all_texts = [summary] + similar_summaries
@@ -481,12 +485,14 @@ async def compute_similarity(
     # 스케일링
     extA_total = extA + topicA
     extA_col_names = ext_col_names + topic_col_names
-    extA_scaled = scale_ext_grouped(extA_total, extA_col_names, 'extA', scalers, group_key_map)
+    extA_scaled = scale_ext_grouped(
+        extA_total, extA_col_names, "extA", scalers, group_key_map
+    )
 
     extB_total = [ext + topic for ext, topic in zip(extBs, topicBs)]
-    extB_col_names = [f'similar_{col}' for col in ext_col_names + topic_col_names]
+    extB_col_names = [f"similar_{col}" for col in ext_col_names + topic_col_names]
     extBs_scaled = [
-        scale_ext_grouped(extB, extB_col_names, 'extB_similar', scalers, group_key_map)
+        scale_ext_grouped(extB, extB_col_names, "extB_similar", scalers, group_key_map)
         for extB in extB_total
     ]
 
@@ -498,14 +504,15 @@ async def compute_similarity(
     scores = []
     for i, (latentB, extB_scaled) in enumerate(zip(latentBs, extBs_scaled)):
         if extB_scaled.shape[0] != 42:
-            raise ValueError(f'extB_scaled 길이 이상함! 기대: 42, 실제: {extB_scaled.shape[0]} | index: {i}')
+            raise ValueError(
+                f"extB_scaled 길이 이상함! 기대: 42, 실제: {extB_scaled.shape[0]} | index: {i}"
+            )
 
         featA = np.concatenate([latentA, extA_scaled]).reshape(1, -1).astype(np.float32)
         featB = np.concatenate([latentB, extB_scaled]).reshape(1, -1).astype(np.float32)
 
         score = regressor_sess.run(
-            [output_name],
-            {inputA_name: featA, inputB_name: featB}
+            [output_name], {inputA_name: featA, inputB_name: featB}
         )[0][0][0]
         scores.append(score)
 
@@ -514,7 +521,7 @@ async def compute_similarity(
     results.sort(key=lambda x: -x[1])  # score 기준 내림차순 정렬
 
     return [
-        {'news_id': nid, 'summary': summ, 'score': float(score), 'rank': i + 1}
+        {"news_id": nid, "summary": summ, "score": float(score), "rank": i + 1}
         for i, (summ, score, nid) in enumerate(results)
     ]
 

@@ -4,7 +4,7 @@ from typing import Callable
 import numpy as np
 
 # prometheus_client : 프로메테우스에서 파이썬 기반으로 작동할 수 있게 해주는 패키지
-from prometheus_client import Histogram
+from prometheus_client import Histogram, Gauge
 from prometheus_fastapi_instrumentator import Instrumentator, metrics
 from prometheus_fastapi_instrumentator.metrics import Info
 
@@ -66,6 +66,15 @@ instrumentator.add(
 # CUSTOM METRIC
 
 
+# ✅ 전역 Gauge 정의 (최근 값 저장용)
+LATEST_SCORE = Gauge(
+    name="latest_news_impact_score",
+    documentation="Latest news impact score from /news/{news_id}/impact_score",
+    namespace="fastapi_model",
+    subsystem="news",
+)
+
+
 def regression_model_output(
     metric_name: str = "news_impact_score_output",
     metric_doc: str = "Impact score value from /news/{news_id}/impact_score",
@@ -88,9 +97,11 @@ def regression_model_output(
             score = info.response.headers.get("X-model-score")
             if score:
                 try:
-                    METRIC.observe(float(score))
+                    score_val = float(score)
+                    METRIC.observe(score_val)  # ✅ 분포 기록
+                    LATEST_SCORE.set(score_val)  # ✅ 최근 값 기록
                 except ValueError:
-                    pass  # 잘못된 값은 무시
+                    pass
 
     return instrumentation
 
