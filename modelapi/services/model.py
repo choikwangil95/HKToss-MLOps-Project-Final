@@ -362,14 +362,17 @@ async def get_stream_response(request, payload):
 
 def get_news_recommended(payload, request):
     """
-    뉴스 본문을 임베딩하는 함수입니다.
+    뉴스 후보군 추천
     """
-    news_clicked_list = payload.news_clicked_list
-    news_candidate_list = payload.news_candidate_list
+    news_clicked_ids = payload.news_clicked_ids
+    news_candidate_ids = payload.news_candidate_ids
 
-    model_recommend = request.app.state.model_recommend
+    # 임베딩
+    news_clicked_list = []
+    news_candidate_list = []
 
     # 추론
+    model_recommend = request.app.state.model_recommend
     outputs = model_recommend.run(
         None,
         {"clicked": news_clicked_list, "candidates": news_candidate_list},

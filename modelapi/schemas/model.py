@@ -76,8 +76,8 @@ class ChatOut(BaseModel):
 
 
 class RecommendIn(BaseModel):
-    news_clicked_list: List
-    news_candidate_list: List
+    news_clicked_ids: List
+    news_candidate_ids: List
 
 
 class RecommendOut(BaseModel):

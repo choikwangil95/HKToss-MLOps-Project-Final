@@ -6,24 +6,23 @@ from schemas.model import (
     ChatOut,
     LdaTopicsIn,
     LdaTopicsOut,
+    RecommendIn,
+    RecommendOut,
     SimilarNewsIn,
     SimilarNewsOut,
 )
 from services.model import (
     get_lda_topic,
+    get_news_recommended,
     get_news_similar_list,
     get_stream_response,
 )
-from services.custom import (
-    get_news_impact_score_service
-)
+from services.custom import get_news_impact_score_service
 
-from schemas.custom import (
-    SimpleImpactResponse
-)
+from schemas.custom import SimpleImpactResponse
 
 
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 import openai
 import os
@@ -94,6 +93,22 @@ async def get_news_summary_router(request: Request, payload: LdaTopicsIn):
 async def chat_stream_endpoint(request: Request, payload: ChatIn):
     return await get_stream_response(request, payload)
 
+
+@router.post(
+    "/recommend",
+    response_model=RecommendOut,
+    summary="뉴스 추천 후보군",
+    description="뉴스 추천 후보군",
+)
+async def get_news_recommend(request: Request, payload: RecommendIn):
+    return JSONResponse(
+        status_code=200,
+        content={"message": "🚧 현재 추천 API는 개발 중입니다. 곧 제공될 예정이에요!"},
+    )
+
+    # return await get_news_recommended(payload, request)
+
+
 @router.get(
     "/{news_id}/impact_score",
     response_model=SimpleImpactResponse,
@@ -101,12 +116,16 @@ async def chat_stream_endpoint(request: Request, payload: ChatIn):
     description="뉴스 ID만 입력하면 해당 뉴스의 임팩트 스코어를 반환합니다.",
 )
 async def get_news_impact_score(
-    request: Request, 
+    request: Request,
     news_id: str = Path(..., description="뉴스 고유 ID", min_length=1),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     특정 뉴스의 임팩트 스코어를 조회합니다.
     """
-    d_plus, d_minus, impact_score = await get_news_impact_score_service(news_id, db, request)  # request 전달
-    return SimpleImpactResponse(d_plus=d_plus, d_minus=d_minus, impact_score=impact_score)
+    d_plus, d_minus, impact_score = await get_news_impact_score_service(
+        news_id, db, request
+    )  # request 전달
+    return SimpleImpactResponse(
+        d_plus=d_plus, d_minus=d_minus, impact_score=impact_score
+    )
