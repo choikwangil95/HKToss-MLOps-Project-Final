@@ -88,7 +88,7 @@ async def get_news_embedding_router(request: Request, payload: EmbeddingIn):
             detail="기사 본문이 비어있습니다. 올바른 본문을 입력해주세요.",
         )
 
-    embeddings = get_news_embeddings(articles, request)
+    embeddings = await get_news_embeddings(articles, request)
     if embeddings is None:
         raise HTTPException(
             status_code=500,

@@ -139,7 +139,7 @@ def extract_ogg_economy(tokens, labels, target_label="OGG_ECONOMY"):
     return stock_list
 
 
-def get_news_embeddings(article_list, request):
+async def get_news_embeddings(article_list, request):
     """
     뉴스 본문 리스트를 임베딩하는 함수입니다.
     ONNX 모델이 배치 입력을 지원할 경우, 한 번에 추론합니다.
