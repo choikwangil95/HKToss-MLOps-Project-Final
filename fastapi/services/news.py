@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import or_, desc, cast
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import text
 from models.news import (
     NewsModel,
@@ -9,7 +10,6 @@ from models.news import (
     ReportModel,
 )
 from schemas.news import News, NewsOut_v2_External, SimilarNewsV2
-from datetime import timedelta
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 import numpy as np
@@ -18,7 +18,8 @@ import datetime
 import json
 import ast
 from fastapi import HTTPException
-from datetime import datetime
+import requests
+from datetime import datetime, timedelta
 
 
 def get_news_list(
@@ -48,6 +49,7 @@ def get_news_list_v2(
     skip: int = 0,
     limit: int = 20,
     title: Optional[str] = None,
+    stock_list: Optional[List[str]] = None,
     start_datetime: Optional[datetime] = None,
     end_datetime: Optional[datetime] = None,
 ):
@@ -55,15 +57,28 @@ def get_news_list_v2(
 
     if title:
         query = query.filter(NewsModel_v2.title.ilike(f"%{title}%"))
-
     if start_datetime:
         query = query.filter(NewsModel_v2.wdate >= start_datetime)
     if end_datetime:
         query = query.filter(NewsModel_v2.wdate <= end_datetime)
 
-    news_list = query.order_by(desc(NewsModel_v2.wdate)).offset(skip).limit(limit).all()
+    # 종목 필터링 - JSONB contains 사용
+    if stock_list:
+        stock_conditions = [
+            cast(NewsModel_v2_Metadata.stock_list_view, JSONB).contains(
+                [{"stock_id": stock_id}]
+            )
+            for stock_id in stock_list
+        ]
+        if stock_conditions:
+            subquery = (
+                db.query(NewsModel_v2_Metadata.news_id)
+                .filter(or_(*stock_conditions))
+                .subquery(name="matched_news_ids")
+            )
+            query = query.filter(NewsModel_v2.news_id.in_(subquery))
 
-    return news_list
+    return query.order_by(desc(NewsModel_v2.wdate)).offset(skip).limit(limit).all()
 
 
 def get_news_detail(db: Session, news_id: str):
@@ -98,6 +113,7 @@ def get_news_detail_v2_metadata(db: Session, news_id: str):
         "news_id": news.news_id,
         "summary": news.summary,
         "stock_list": news.stock_list,
+        "stock_list_view": news.stock_list_view,
         "industry_list": news.industry_list,
         "impact_score": (
             f"{news.impact_score:.3f}" if news.impact_score is not None else None
@@ -271,13 +287,12 @@ def find_stock_effected(db: Session, news_id: str):
     return [{"news_id": news.news_id, "stocks": stocks}] if news.stocks else []
 
 
-
 ########################### highlights ###############################
 
 # def get_top_news(db: Session, hours: int = 24, limit: int = 10) -> list[NewsModel_v2]:
 #     """24시간 내 상위 영향력 뉴스 조회"""
 #     time_threshold = datetime.utcnow() - timedelta(hours=hours)
-    
+
 #     return db.query(NewsModel_v2).filter(
 #         NewsModel_v2.impact_score != None,
 #         NewsModel_v2.created_at >= time_threshold
@@ -299,15 +314,15 @@ def get_top_impact_news(
     db: Session,
     start_datetime: datetime,
     end_datetime: datetime,
-    limit: int = 10
+    limit: int = 10,
+    stock_list: Optional[List[str]] = None,
 ) -> list[dict]:
     """특정 기간 내 상위 impact_score 뉴스 조회"""
-    # 1. 날짜 범위 유효성 검증
     if start_datetime >= end_datetime:
         raise ValueError("시작일은 종료일보다 앞서야 합니다.")
-    
-    # 2. 조인 쿼리
-    results = (
+
+    # 기본 쿼리
+    query = (
         db.query(
             NewsModel_v2.news_id,
             NewsModel_v2.wdate,
@@ -316,23 +331,34 @@ def get_top_impact_news(
             NewsModel_v2.press,
             NewsModel_v2.url,
             NewsModel_v2_Metadata.summary,
-            NewsModel_v2_Metadata.impact_score
+            NewsModel_v2_Metadata.impact_score,
         )
         .join(
-            NewsModel_v2_Metadata,
-            NewsModel_v2.news_id == NewsModel_v2_Metadata.news_id
+            NewsModel_v2_Metadata, NewsModel_v2.news_id == NewsModel_v2_Metadata.news_id
         )
         .filter(
             NewsModel_v2.wdate >= start_datetime,
             NewsModel_v2.wdate < end_datetime,
-            NewsModel_v2_Metadata.impact_score.isnot(None)
+            NewsModel_v2_Metadata.impact_score.isnot(None),
         )
-        .order_by(NewsModel_v2_Metadata.impact_score.desc())
-        .limit(limit)
-        .all()
     )
-    
-    # 3. 딕셔너리 형태로 변환
+
+    # 종목 필터링 (JSONB contains 방식)
+    if stock_list:
+        stock_conditions = [
+            cast(NewsModel_v2_Metadata.stock_list, JSONB).contains(
+                [{"stock_id": stock_id}]
+            )
+            for stock_id in stock_list
+        ]
+        if stock_conditions:
+            query = query.filter(or_(*stock_conditions))
+
+    # 정렬 및 결과 추출
+    results = (
+        query.order_by(NewsModel_v2_Metadata.impact_score.desc()).limit(limit).all()
+    )
+
     return [
         {
             "news_id": row.news_id,
@@ -342,119 +368,140 @@ def get_top_impact_news(
             "press": row.press,
             "summary": row.summary,
             "impact_score": row.impact_score,
-            "url": row.url
+            "url": row.url,
         }
         for row in results
     ]
 
 
 def find_news_similar_v2(
-    db: Session,
-    news_id: str,
-    top_n: int,
-    min_gap_days: int,
-    min_gap_between: int
+    db: Session, news_id: str, top_n: int, min_gap_days: int, min_gap_between: int
 ) -> List[SimilarNewsV2]:
-    # 기준 뉴스 임베딩 가져오기
-    ref_result = db.execute(
-        text("""
-        SELECT news_id, wdate, embedding
-        FROM news_v2_embedding
-        WHERE news_id = :news_id
-        """),
-        {"news_id": news_id}
-    ).fetchone()
+    # 기준 뉴스 조회
+    ref_news_meta = (
+        db.query(NewsModel_v2_Metadata)
+        .filter(NewsModel_v2_Metadata.news_id == news_id)
+        .first()
+    )
+    ref_news_raw = (
+        db.query(NewsModel_v2).filter(NewsModel_v2.news_id == news_id).first()
+    )
 
-    if ref_result is None:
-        raise Exception(f"news_id {news_id} not found")
-
-    ref_news_id, ref_wdate, ref_embedding = ref_result
-    ref_embedding = np.array(json.loads(ref_embedding))
-
-    # 후보 embedding 가져오기
-    candidates = db.execute(
-        text("""
-        SELECT news_id, wdate, embedding
-        FROM news_v2_embedding
-        WHERE news_id != :news_id
-        AND wdate <= :ref_wdate - INTERVAL ':min_gap_days days'
-        AND embedding IS NOT NULL
-        """),
-        {
-            "news_id": news_id,
-            "ref_wdate": ref_wdate,
-            "min_gap_days": min_gap_days
-        },
-    ).fetchall()
-
-    # 유사도 계산
-    similarities = []
-    for row in candidates:
-        cand_news_id, cand_wdate, cand_embedding = row
-        cand_embedding = np.array(json.loads(cand_embedding))
-
-        similarity_score = cosine_similarity(
-            ref_embedding.reshape(1, -1), 
-            cand_embedding.reshape(1, -1)
-        )[0][0]
-
-        similarities.append((cand_news_id, cand_wdate, similarity_score))
-
-    # 유사도 정렬 + 조건 적용
-    similarities.sort(key=lambda x: x[2], reverse=True)
-
-    selected_news_ids = []
-    selected_dates = []
-    selected_similarities = {}
-
-    for cand_news_id, cand_wdate, similarity_score in similarities:
-        if all(abs((cand_wdate - d).days) >= min_gap_between for d in selected_dates):
-            selected_news_ids.append(cand_news_id)
-            selected_dates.append(cand_wdate)
-            selected_similarities[cand_news_id] = similarity_score
-
-        if len(selected_news_ids) >= top_n:
-            break
-
-    if not selected_news_ids:
+    if not ref_news_raw:
         return []
 
-    # 관련 정보 가져오기 (join 조회) → text() 추가!
-    rows = db.execute(
-        text("""
-        SELECT
-            v.news_id,
-            v.wdate,
-            n.title,
-            n.press,
-            n.url,
-            n.image,
-            m.summary
-        FROM
-            news_v2_embedding v
-        JOIN
-            news_v2 n ON v.news_id = n.news_id
-        JOIN
-            news_v2_metadata m ON v.news_id = m.news_id
-        WHERE
-            v.news_id IN :news_id_list
-        """),
-        {"news_id_list": tuple(selected_news_ids)}
-    ).fetchall()
+    ref_wdate = ref_news_raw.wdate
 
-    # 최종 response 구성 → List[SimilarNewsV2]
-    related_news = [
-        SimilarNewsV2(
-            news_id=row.news_id,
-            wdate=row.wdate.isoformat(),
-            title=row.title or "",          # None 방어 추가
-            press=row.press or "",          # None 방어 추가
-            url=row.url or "",              # None 방어 추가
-            image=row.image or "",          # None 방어 추가
-            summary=row.summary or "",      # None 방어 추가
-            similarity=selected_similarities[row.news_id]
+    # 기준 뉴스 텍스트 추출
+    text = ref_news_meta.summary if ref_news_meta else ref_news_raw.article[:300]
+    if not text.strip():
+        return []
+
+    # 유사 뉴스 API 호출
+    try:
+        response = requests.post(
+            "http://15.165.211.100:8000/news/similar",
+            json={"article": text, "top_k": 50},
         )
-        for row in rows
-    ]
+        response.raise_for_status()
+        similar_news_list = response.json()["similar_news_list"]
+    except Exception as e:
+        print(f"❌ 유사 뉴스 API 요청 실패: {e}")
+        return []
 
-    return related_news
+    # 유사 뉴스 요약 맵
+    summary_map = {
+        item["news_id"]: {
+            "summary": item["summary"],
+            "similarity": item["similarity"],
+        }
+        for item in similar_news_list
+    }
+
+    similar_ids = list(summary_map.keys())
+
+    # DB에서 메타 정보 조회
+    results = (
+        db.query(
+            NewsModel_v2.news_id,
+            NewsModel_v2.wdate,
+            NewsModel_v2.title,
+            NewsModel_v2.image,
+            NewsModel_v2.press,
+            NewsModel_v2.url,
+        )
+        .filter(NewsModel_v2.news_id.in_(similar_ids))
+        .all()
+    )
+
+    # SimilarNewsV2 객체 생성
+    output = []
+    for row in results:
+        meta = summary_map.get(row.news_id)
+        if meta:
+            output.append(
+                SimilarNewsV2(
+                    news_id=row.news_id,
+                    wdate=row.wdate.isoformat(),
+                    title=row.title,
+                    press=row.press,
+                    url=row.url,
+                    image=row.image,
+                    summary=meta["summary"],
+                    similarity=round(meta["similarity"], 3),
+                )
+            )
+
+    # 유사도 높은 순 정렬
+    output.sort(key=lambda x: x.similarity, reverse=True)
+
+    # 필터링 조건 적용
+    min_date = ref_wdate - timedelta(days=min_gap_days)
+
+    def is_far_enough(new_date: datetime, selected_dates: List[datetime]) -> bool:
+        return all(abs((new_date - d).days) >= min_gap_between for d in selected_dates)
+
+    filtered_output = []
+    selected_dates = []
+
+    for item in output:
+        item_date = datetime.fromisoformat(item.wdate)
+        if (
+            item.similarity < 0.9
+            and item_date <= min_date
+            and is_far_enough(item_date, selected_dates)
+        ):
+            filtered_output.append(item)
+            selected_dates.append(item_date)
+        if len(filtered_output) >= top_n:
+            break
+
+    return filtered_output
+
+
+def get_news_recommended(user_id, db):
+
+    # 날짜 범위 설정
+    end_datetime = datetime.now().replace(
+        hour=23, minute=59, second=59, microsecond=999999
+    )
+    start_datetime = (end_datetime - timedelta(days=7)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+    # 후보 뉴스 = 최신 주요 뉴스
+    top_news = get_top_impact_news(
+        db=db,
+        start_datetime=start_datetime,
+        end_datetime=end_datetime,
+        limit=20,
+        stock_list=None,
+    )
+
+    # 유저 뉴스 로그 가져오기
+
+    # 추천 모델 호출하기
+
+    # 추천 뉴스 리턴하기
+
+    return top_news

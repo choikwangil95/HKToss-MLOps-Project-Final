@@ -47,6 +47,8 @@ jobs:
             mkdir -p ${{ secrets.EC2_PROJECT_DIR }}
             cd ${{ secrets.EC2_PROJECT_DIR }}
 
+            echo "KOREA_BANK_API_KEY=${{ secrets.KOREA_BANK_API_KEY }}" > .env
+
             if [ ! -d ".git" ]; then
               echo "📦 Git 저장소 클론 중..."
               git init -b main

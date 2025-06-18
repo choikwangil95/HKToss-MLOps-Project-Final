@@ -3,3 +3,5 @@
 best_lda_model.pkl
 count_vectorizer.pkl
 /kr_sbert_mean_onnx
+/saved_models
+/two_tower_model.onnx

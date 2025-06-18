@@ -9,12 +9,14 @@ from schemas.news import (
     NewsOut_v2,
     NewsOut_v2_External,
     NewsOut_v2_Metadata,
+    RecommendedNewsV2,
     SimilarNews,
     Report,
     NewsStock,
     PastReportsResponse,
     TopNewsResponse,
-    SimilarNewsV2
+    SimilarNewsV2,
+    parse_comma_separated_stock_list,
 )
 from services.news import (
     get_news_detail_v2_external,
@@ -24,10 +26,11 @@ from services.news import (
     get_news_detail,
     get_news_detail_v2,
     find_news_similar,
+    get_news_recommended,
     get_similar_past_reports,
     find_stock_effected,
     get_top_impact_news,
-    find_news_similar_v2
+    find_news_similar_v2,
 )
 from core.db import get_db
 from typing import List
@@ -188,6 +191,7 @@ async def list_news_v2(
     title: Optional[str] = Query(
         None, description="뉴스 제목 필터링 (부분 일치)", max_length=50
     ),
+    stock_list: Optional[List[str]] = Depends(parse_comma_separated_stock_list),
     start_datetime: Optional[datetime] = Query(
         None, description="시작 일시 (예: 2025-05-01T00:00:00)"
     ),
@@ -208,6 +212,7 @@ async def list_news_v2(
         skip=skip,
         limit=limit,
         title=title,
+        stock_list=stock_list,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
     )
@@ -220,17 +225,39 @@ async def list_news_v2(
     description="지정된 기간 동안 주요 뉴스 기사를 조회합니다.",
 )
 async def get_top_impact_news_api(
-    start_datetime: datetime = Query(..., description="시작 일시 (예: 2025-05-15T00:00:00)"),
-    end_datetime: datetime = Query(..., description="종료 일시 (예: 2025-05-16T00:00:00)"),
+    start_datetime: datetime = Query(
+        ..., description="시작 일시 (예: 2025-05-15T00:00:00)"
+    ),
+    end_datetime: datetime = Query(
+        ..., description="종료 일시 (예: 2025-05-16T00:00:00)"
+    ),
     limit: int = Query(10, description="반환 개수 (최대 100)", ge=1, le=100),
-    db: Session = Depends(get_db)
+    stock_list: Optional[List[str]] = Depends(parse_comma_separated_stock_list),
+    db: Session = Depends(get_db),
 ):
     """
     주요 뉴스 목록을 조회합니다.
     """
-    news_list = get_top_impact_news(db, start_datetime, end_datetime, limit)
-    
+    news_list = get_top_impact_news(db, start_datetime, end_datetime, limit, stock_list)
+
     return news_list
+
+
+@router_v2.get(
+    "/recommend",
+    response_model=list[TopNewsResponse],
+    summary="뉴스 맞춤 추천",
+    description="뉴스 맞춤 추천",
+)
+async def get_news_summary_router(
+    user_id: Optional[str] = Query(None, description="유저 고유 ID (선택)"),
+    db: Session = Depends(get_db),
+):
+    """
+    뉴스 맞춤 추천
+    """
+    return await run_in_threadpool(get_news_recommended, user_id, db)
+
 
 @router_v2.get(
     "/{news_id}",
@@ -247,6 +274,37 @@ async def news_detail(
     """
 
     return await run_in_threadpool(get_news_detail_v2, db, news_id)
+
+
+@router_v2.get(
+    "/{news_id}/similar",
+    response_model=List[SimilarNewsV2],
+    summary="[완료] 뉴스 관련 과거 유사 뉴스 조회",
+    description="입력한 뉴스와 유사한 과거 뉴스를 조건에 따라 필터링하여 조회합니다.",
+)
+async def similar_news_v2(
+    news_id: str = Path(..., description="기준이 되는 뉴스 ID"),
+    top_n: int = Query(5, description="가장 유사한 뉴스 개수", ge=1, le=50),
+    min_gap_days: int = Query(
+        90, description="기준 뉴스와 유사 뉴스 간 최소 시간 간격 (일 단위)"
+    ),
+    min_gap_between: int = Query(
+        30, description="유사 뉴스 간 최소 시간 간격 (일 단위)"
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    기준 뉴스와 유사한 과거 뉴스 목록을 반환합니다.
+    """
+    try:
+        result = await run_in_threadpool(
+            find_news_similar_v2, db, news_id, top_n, min_gap_days, min_gap_between
+        )
+        if result is None:
+            return []
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router_v2.get(
@@ -281,36 +339,3 @@ async def news_detail_external(
     """
 
     return await run_in_threadpool(get_news_detail_v2_external, db, news_id)
-
-
-import logging
-logger = logging.getLogger(__name__)
-@router_v2.get(
-    "/{news_id}/related/news",
-    response_model=List[SimilarNewsV2],
-    summary="[v2] 뉴스 관련 과거 유사 뉴스 조회",
-    description="입력한 뉴스와 유사한 과거 뉴스를 조건에 따라 필터링하여 조회합니다.",
-)
-async def similar_news_v2(
-    news_id: str = Path(..., description="기준이 되는 뉴스 ID"),
-    top_n: int = Query(5, description="가장 유사한 뉴스 개수", ge=1, le=50),
-    min_gap_days: int = Query(
-        180, description="기준 뉴스와 유사 뉴스 간 최소 시간 간격 (일 단위)"
-    ),
-    min_gap_between: int = Query(
-        90, description="유사 뉴스 간 최소 시간 간격 (일 단위)"
-    ),
-    db: Session = Depends(get_db),
-):
-    """
-    [v2] 기준 뉴스와 유사한 과거 뉴스 목록을 반환합니다.
-    """
-    try:
-        result = find_news_similar_v2(db, news_id, top_n, min_gap_days, min_gap_between)
-        if result is None:
-            logger.warning(f"No similar news found for news_id={news_id}, returning empty list.")
-            return []
-        return result
-    except Exception as e:
-        logger.exception(f"Error while finding similar news for news_id={news_id}")
-        raise HTTPException(status_code=500, detail=str(e))

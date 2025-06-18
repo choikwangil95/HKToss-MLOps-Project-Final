@@ -1,7 +1,8 @@
+from fastapi import Query
 from pydantic import BaseModel, field_validator, Field
 from typing import Optional
 from datetime import datetime, date
-from typing import List, Union
+from typing import List, Union, Dict
 from pydantic import validator
 import ast
 
@@ -44,6 +45,16 @@ class SimilarNews(BaseModel):
 #############################
 
 
+def parse_comma_separated_stock_list(
+    stock_list: Optional[str] = Query(
+        None, description="콤마(,)로 구분된 종목코드 리스트 (예: 005930,000660)"
+    )
+) -> Optional[List[str]]:
+    if stock_list is None or stock_list.strip() == "":
+        return None
+    return [s.strip() for s in stock_list.split(",") if s.strip()]
+
+
 class News_v2(BaseModel):
     news_id: str
     wdate: Optional[datetime]
@@ -74,14 +85,15 @@ class NewsOut_v2(BaseModel):
 class NewsOut_v2_Metadata(BaseModel):
     news_id: str
     summary: str
-    stock_list: Optional[List[str]] = []  # None이면 빈 리스트
-    industry_list: Optional[List[str]] = []  # None이면 빈 리스트
+    stock_list: Optional[List[Dict[str, str]]] = []
+    stock_list_view: Optional[List[Dict[str, str]]] = []
+    industry_list: Optional[List[Dict[str, str]]] = []
     impact_score: Optional[float]
 
     class Config:
         from_attributes = True
 
-    @field_validator("stock_list", "industry_list", mode="before")
+    @field_validator("stock_list", "stock_list_view", "industry_list", mode="before")
     @classmethod
     def parse_list(cls, v):
         if v is None:
@@ -92,6 +104,7 @@ class NewsOut_v2_Metadata(BaseModel):
             except Exception:
                 return [v]
         return v
+
 
 class NewsOut_v2_External(BaseModel):
     news_id: str
@@ -176,7 +189,8 @@ class TopNewsResponse(BaseModel):
     url: Optional[str]
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
 
 class SimilarNewsV2(BaseModel):
     news_id: str
@@ -190,4 +204,16 @@ class SimilarNewsV2(BaseModel):
 
     class Config:
         orm_mode = True
-        
+
+
+class RecommendedNewsV2(BaseModel):
+    news_id: str
+    wdate: str  # ISO format으로 주기 위해 str 처리
+    title: str
+    article: str
+    press: str
+    url: str
+    image: str
+
+    class Config:
+        orm_mode = True

@@ -1,7 +1,8 @@
+from fastapi import Query
 from pydantic import BaseModel, field_validator, Field
 from typing import Optional
 from datetime import datetime, date
-from typing import List, Union
+from typing import List, Union, Dict
 from pydantic import validator
 import ast
 
@@ -26,10 +27,58 @@ class StockOut(BaseModel):
 
 
 class EmbeddingIn(BaseModel):
-    article: str
+    articles: List[str]
 
 
 class EmbeddingOut(BaseModel):
-    embedding: List[List[float]] = Field(
-        default_factory=list, description="(1, 768) 형식의 임베딩 벡터"
+    embeddings: List[List[float]] = Field(
+        default_factory=list, description="(n, 768) 형식의 임베딩 벡터 리스트"
     )
+
+
+class SimilarNewsIn(BaseModel):
+    article: str
+    top_k: int = Query(5, description="가장 유사한 뉴스 개수", ge=1, le=100)
+
+
+class SimilarNewsItem(BaseModel):
+    news_id: str
+    wdate: str
+    title: str
+    summary: str
+    url: Optional[str] = None
+    image: Optional[str] = None
+    stock_list: Optional[List[str]] = []
+    industry_list: Optional[List[str]] = []
+    similarity: float
+
+
+class SimilarNewsOut(BaseModel):
+    similar_news_list: List[SimilarNewsItem]
+
+
+class LdaTopicsIn(BaseModel):
+    article: str
+
+
+class LdaTopicsOut(BaseModel):
+    lda_topics: Dict[str, float]  # 예: {"topic1": 0.15, "topic2": 0.03, ...}
+
+
+class ChatIn(BaseModel):
+    client_id: str
+    question: str
+
+
+class ChatOut(BaseModel):
+    client_id: str
+    answer: str
+
+
+class RecommendIn(BaseModel):
+    news_clicked_ids: List
+    news_candidate_ids: List
+
+
+class RecommendOut(BaseModel):
+    news_recommended: List
