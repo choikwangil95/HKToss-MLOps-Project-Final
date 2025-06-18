@@ -401,7 +401,7 @@ def find_news_similar_v2(
     try:
         response = requests.post(
             "http://15.165.211.100:8000/news/similar",
-            json={"article": text, "top_k": 50},
+            json={"article": text, "top_k": 10},
         )
         response.raise_for_status()
         similar_news_list = response.json()["similar_news_list"]

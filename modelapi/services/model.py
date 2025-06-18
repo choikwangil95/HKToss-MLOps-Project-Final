@@ -194,13 +194,22 @@ def get_news_similar_list(payload, request):
     vectordb = request.app.state.vectordb
 
     # 검색
-    results = vectordb.similarity_search_with_score(article, k=top_k)
+    results = vectordb.similarity_search_with_score(article, k=100)[:top_k]
 
     news_similar_list = []
+    seen_titles = set()
+
     for doc, score in results:
+        if score > 0.9:
+            continue  # 유사도가 너무 높으면 제외 (0.9 이상 필터링)
+
+        title = doc.metadata.get("title")
+        if title in seen_titles:
+            continue  # 이미 추가한 title이면 스킵
+        seen_titles.add(title)
+
         news_id = doc.metadata.get("news_id")
         wdate = doc.metadata.get("wdate")
-        title = doc.metadata.get("title")
         summary = doc.page_content
         url = doc.metadata.get("url")
         image = doc.metadata.get("image")

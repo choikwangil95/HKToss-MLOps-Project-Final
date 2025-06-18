@@ -356,6 +356,13 @@ async def predict_and_calculate_impact(data: dict, request: Request):
     predicted_closes = predictions_original[0].tolist()
     print(f"예측된 종가 (d+1~d+5): {predicted_closes}")
 
+    baseline_mean = [-0.0078573, -0.0083497, -0.00810895, -0.00799404, -0.00891119]
+    baseline_std = [0.06588189, 0.07283064, 0.07710478, 0.08238087, 0.08863377]
+
+    z_scores = (np.array(predicted_closes) - np.array(baseline_mean)) / np.array(
+        baseline_std
+    )
+
     # 9. 과거 종가 추출
     historical_closes = [
         data["d_minus_1_date_close"],
@@ -375,7 +382,7 @@ async def predict_and_calculate_impact(data: dict, request: Request):
     print(f"전체 가격 범위: {min_price:.2f} ~ {max_price:.2f}")
     print(f"최종 impact_score: {impact_score:.6f}")
 
-    return predicted_closes, historical_closes, impact_score
+    return predicted_closes, historical_closes, impact_score, z_scores
 
 
 async def get_news_impact_score_service(news_id: str, db: Session, request: Request):
@@ -388,12 +395,12 @@ async def get_news_impact_score_service(news_id: str, db: Session, request: Requ
         print(f"✓ DB 데이터 조회 완료")
 
         # 2. 예측 및 임팩트 스코어 계산
-        d_plus, d_minus, impact_score = await predict_and_calculate_impact(
+        d_plus, d_minus, impact_score, z_scores = await predict_and_calculate_impact(
             data, request
         )
         print(f"✓ 임팩트 스코어 계산 완료: {impact_score}")
 
-        return d_plus, d_minus, impact_score
+        return d_plus, d_minus, impact_score, z_scores
 
     except Exception as e:
         print(f"서비스 오류: {e}")

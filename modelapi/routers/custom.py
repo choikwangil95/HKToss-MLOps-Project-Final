@@ -1,4 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request, Body
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Path,
+    Request,
+    Body,
+    Response,
+)
 from sqlalchemy.orm import Session
 from db.postgresql import get_db
 from schemas.model import (
@@ -21,6 +30,7 @@ from services.custom import get_news_impact_score_service
 
 from schemas.custom import SimpleImpactResponse
 
+import numpy as np
 
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
@@ -117,15 +127,21 @@ async def get_news_recommend(request: Request, payload: RecommendIn):
 )
 async def get_news_impact_score(
     request: Request,
+    response: Response,  # ✅ 추가
     news_id: str = Path(..., description="뉴스 고유 ID", min_length=1),
     db: Session = Depends(get_db),
 ):
     """
     특정 뉴스의 임팩트 스코어를 조회합니다.
     """
-    d_plus, d_minus, impact_score = await get_news_impact_score_service(
+    d_plus, d_minus, impact_score, z_scores = await get_news_impact_score_service(
         news_id, db, request
     )  # request 전달
+
+    # ✅ z_scores를 헤더에 JSON 형식으로 추가
+    z_score_mean = float(np.mean(z_scores))
+    response.headers["X-model-score"] = str(z_score_mean)  # Prometheus용 헤더 추가
+
     return SimpleImpactResponse(
         d_plus=d_plus, d_minus=d_minus, impact_score=impact_score
     )
