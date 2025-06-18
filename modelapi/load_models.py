@@ -10,7 +10,6 @@ import requests
 import openai
 from dotenv import load_dotenv
 import pickle
-import onnxruntime as ort
 
 load_dotenv()
 
@@ -255,10 +254,7 @@ def get_similarity_model():
     # 스케일러 로딩
     scalers = load_scalers_by_group(scaler_dir)
 
-    # tokenizer는 이제 사용하지 않음 → 대신 embedding API URL 저장
-    embedding_api_url = "http://15.165.211.100:8000/plm/embedding"
-
-    return scalers, ae_sess, regressor_sess, embedding_api_url
+    return scalers, ae_sess, regressor_sess
 
 def get_recommend_model():
     model_base_path = Path("models")

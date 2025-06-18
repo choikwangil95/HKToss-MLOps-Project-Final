@@ -147,23 +147,6 @@ def get_complete_external_cols():
     return external_cols, groups
 
 
-async def get_embedding(text: str, request) -> np.ndarray:
-    """API 대신 내부 임베딩 함수 사용 (실패 시에만 디버깅)"""
-    if not text or len(text.strip()) == 0:
-        raise ValueError("임베딩할 텍스트가 비어있습니다.")
-
-    try:
-        embedding_list = get_news_embedding(text.strip(), request)
-        embedding = np.array(embedding_list, dtype=np.float32)
-        if embedding.ndim == 1:
-            embedding = embedding.reshape(1, -1)
-        return embedding
-
-    except Exception as e:
-        print(f"임베딩 벡터 생성 실패: {e}")
-        raise RuntimeError(f"임베딩 벡터 생성 실패: {e}")
-
-
 def apply_scaling_complete(df: pd.DataFrame, fitted_scalers: dict) -> tuple:
     """스케일링 적용 - 첨부된 코드와 동일"""
     df_scaled = df.copy()

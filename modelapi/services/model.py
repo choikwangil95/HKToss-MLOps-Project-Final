@@ -408,9 +408,8 @@ def scale_ext_grouped(ext: list, col_names: list, prefix: str, scalers: dict, gr
 
     return np.array(scaled, dtype=np.float32)
 
-
 # 회귀 기반 유사 뉴스 유사도 계산 함수
-def compute_similarity(
+async def compute_similarity(
     db: Session,
     summary: str,
     extA: list,
@@ -426,6 +425,7 @@ def compute_similarity(
     topic_col_names: list,
     news_topk_ids: list
 ):
+    
     # group_key_map 생성 (기준 + 유사 뉴스)
     group_key_map = {}
     for col in ext_col_names + topic_col_names:
@@ -463,7 +463,8 @@ def compute_similarity(
 
     # 텍스트 임베딩 + AE 인코딩
     all_texts = [summary] + similar_summaries
-    embeddings = np.array(embedding_api_func(all_texts))
+    embeddings = np.array(await embedding_api_func(all_texts))
+
     embA, embBs = embeddings[0], embeddings[1:]
     latentA = run_ae(ae_sess, embA.reshape(1, -1))[0]
     latentBs = [run_ae(ae_sess, e.reshape(1, -1))[0] for e in embBs]
@@ -507,6 +508,8 @@ def compute_similarity(
         {'news_id': nid, 'summary': summ, 'score': float(score), 'rank': i + 1}
         for i, (summ, score, nid) in enumerate(results)
     ]
+
+
 def get_news_recommended(payload, request):
     """
     뉴스 후보군 추천

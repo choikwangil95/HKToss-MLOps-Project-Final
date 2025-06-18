@@ -16,6 +16,7 @@ from schemas.model import (
 )
 from services.model import (
     get_lda_topic,
+    get_news_embeddings,
     get_news_recommended,
     get_news_similar_list,
     get_stream_response,
@@ -117,35 +118,12 @@ async def get_similarity_scores(request: Request, payload: SimilarityRequest, db
     ae_sess = request.app.state.ae_sess
     regressor_sess = request.app.state.regressor_sess
     
-    def embedding_api_func(texts):
-        embeddings = []
-        for text in texts:
-            res = requests.post(
-                request.app.state.embedding_api_url,
-                json={'article': text}  # 단일 문자열
-            )
+    async def embedding_api_func(texts):
+        embeddings = await get_news_embeddings(texts, request)
 
-            print('🟡 응답 상태:', res.status_code)
-            print('🟡 응답 본문:', res.text)
-
-            try:
-                data = res.json()
-            except Exception as e:
-                print('🔴 JSON 파싱 실패:', str(e))
-                raise HTTPException(status_code=500, detail='임베딩 API 응답이 JSON 형식이 아닙니다.')
-
-            if 'embedding' not in data:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"임베딩 API 응답에 'embedding' 키가 없습니다. 응답 내용: {data}"
-                )
-
-            embeddings.append(data['embedding'][0])  # 보통 [[...]] 형태이므로 [0]으로 접근
-
-            print('🟡 임베딩 결과:', embeddings)
+        print('🟡 임베딩 결과:', embeddings)
 
         return embeddings
-
 
     news_id = payload.news_id
     news_topk_ids = payload.news_topk_ids or []
@@ -218,7 +196,7 @@ async def get_similarity_scores(request: Request, payload: SimilarityRequest, db
         raise HTTPException(status_code=400, detail=f"토픽 변수 없는 뉴스 ID: {missing_topic_ids}")
 
     # 유사도 점수 계산
-    results = compute_similarity(
+    results = await compute_similarity(
         db=db,
         summary=summary,
         extA=extA,
@@ -237,9 +215,11 @@ async def get_similarity_scores(request: Request, payload: SimilarityRequest, db
 
     # news_id 매핑
     news_id_map = dict(zip(similar_summaries, news_topk_ids))
-
     for r in results:
         r['news_id'] = news_id_map.get(r['summary'], 'unknown')
+
+    # 유사도 score 기준 정렬
+    results.sort(key=lambda x: x['score'], reverse=True)
 
     return SimilarityResponse(results=[SimilarityResult(**r) for r in results])
 

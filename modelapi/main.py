@@ -9,7 +9,7 @@ from load_models import (
     get_summarize_model,
     get_ner_tokenizer,
     get_vectordb,
-    get_prediction_models,
+    get_prediction_models
 )
 from monitoring import instrumentator
 import logging
@@ -86,11 +86,11 @@ async def startup_event():
 
     print("🟡 [STARTUP] Similarity 모델 로딩 중...")
 
-    scalers, ae_sess, regressor_sess, embedding_api_url = get_similarity_model()
+    scalers, ae_sess, regressor_sess = get_similarity_model()
     app.state.scalers = scalers
     app.state.ae_sess = ae_sess
     app.state.regressor_sess = regressor_sess
-    app.state.embedding_api_url = embedding_api_url
+
     print("🟢 [DONE] Similarity 모델 로딩 완료")
     
     logger.info("🟡 뉴스 추천 모델 불러오는 중...")
