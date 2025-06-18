@@ -12,6 +12,7 @@ import redis
 from concurrent.futures import ThreadPoolExecutor
 
 import ast
+import pandas as pd
 
 
 def get_news_summary(
@@ -409,7 +410,12 @@ def scale_ext_grouped(
         if key in scalers:
             try:
                 values = np.array(grouped_data[key], dtype=np.float32).reshape(1, -1)
-                transformed = scalers[key].transform(values)[0]
+                # transformed = scalers[key].transform(values)[0]
+
+                columns = scalers[key].feature_names_in_  # sklearn >=1.0
+                values_df = pd.DataFrame(values, columns=columns)
+                transformed = scalers[key].transform(values_df)[0]
+
                 for idx, val in zip(grouped_indices[key], transformed):
                     scaled[idx] = val
             except Exception as e:
@@ -521,7 +527,13 @@ async def compute_similarity(
     results.sort(key=lambda x: -x[1])  # score 기준 내림차순 정렬
 
     return [
-        {"news_id": nid, "summary": summ, "score": float(score), "rank": i + 1}
+        {
+            "news_id": nid,
+            "summary": summ,
+            "wdate": "",
+            "score": float(score),
+            "rank": i + 1,
+        }
         for i, (summ, score, nid) in enumerate(results)
     ]
 
