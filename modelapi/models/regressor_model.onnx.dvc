@@ -1,0 +1,5 @@
+outs:
+- md5: f6c7324bd133a18b68334a266a653c0b
+  size: 616546
+  hash: md5
+  path: regressor_model.onnx

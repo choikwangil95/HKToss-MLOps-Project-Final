@@ -14,18 +14,18 @@ services:
     environment:
       - ENABLE_METRICS=true
 
-  prometheus:
-    image: prom/prometheus
-    container_name: prometheus
-    command:
-      - '--web.listen-address=0.0.0.0:9090'
-      - '--config.file=/etc/prometheus/prometheus.yml'
-    ports:
-      - 9090:9090
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+  # prometheus:
+  #   image: prom/prometheus
+  #   container_name: prometheus
+  #   command:
+  #     - '--web.listen-address=0.0.0.0:9090'
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #   ports:
+  #     - 9090:9090
+  #   volumes:
+  #     - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
 
-  grafana:
-    image: grafana/grafana
-    ports:
-      - "3000:3000"
+  # grafana:
+  #   image: grafana/grafana
+  #   ports:
+  #     - "3000:3000"
