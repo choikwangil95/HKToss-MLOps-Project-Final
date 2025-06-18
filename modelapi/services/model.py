@@ -4,6 +4,13 @@ from konlpy.tag import Okt
 import numpy as np
 
 from schemas.model import SimilarNewsItem
+import asyncio
+from fastapi.responses import StreamingResponse
+import json
+import redis
+from concurrent.futures import ThreadPoolExecutor
+
+import ast
 
 
 def get_news_summary(
@@ -154,6 +161,15 @@ def get_news_embedding(text, request):
     return [[float(x) for x in embedding[0]]]
 
 
+def safe_parse_list(val):
+    if isinstance(val, str):
+        try:
+            return ast.literal_eval(val)
+        except Exception:
+            return []
+    return val if isinstance(val, list) else []
+
+
 def get_news_similar_list(payload, request):
     """
     유사 뉴스 top_k
@@ -170,7 +186,12 @@ def get_news_similar_list(payload, request):
     for doc, score in results:
         news_id = doc.metadata.get("news_id")
         wdate = doc.metadata.get("wdate")
+        title = doc.metadata.get("title")
         summary = doc.page_content
+        url = doc.metadata.get("url")
+        image = doc.metadata.get("image")
+        stock_list = safe_parse_list(doc.metadata.get("stock_list"))
+        industry_list = safe_parse_list(doc.metadata.get("industry_list"))
 
         if not news_id or not wdate or not summary:
             continue
@@ -178,9 +199,14 @@ def get_news_similar_list(payload, request):
         news_similar_list.append(
             SimilarNewsItem(
                 news_id=news_id,
-                summary=summary,
                 wdate=wdate,
-                score=round(1 - float(score), 2),
+                title=title,
+                summary=summary,
+                url=url,
+                image=image,
+                stock_list=stock_list,
+                industry_list=industry_list,
+                impact_score=round(1 - float(score), 2),
             )
         )
 
@@ -222,3 +248,136 @@ def get_lda_topic(text, request):
         lda_topics[f"topic_{index+1}"] = value
 
     return lda_topics
+
+
+# ✅ 전역 Redis 연결 재사용
+redis_conn = redis.Redis(
+    host="43.200.17.139",
+    port=6379,
+    password="q1w2e3r4!@#",
+    decode_responses=True,
+)
+
+# ✅ 전역 ThreadPoolExecutor (스레드 재사용)
+redis_executor = ThreadPoolExecutor(max_workers=10)
+
+
+# ✅ Redis 비동기 전송 함수
+def send_to_redis_async(data: dict):
+    def task():
+        try:
+            redis_conn.publish("chat-response", json.dumps(data, ensure_ascii=False))
+        except Exception as e:
+            print(f"[Redis Error] {type(e).__name__}: {e}")
+
+    redis_executor.submit(task)
+
+
+# ✅ SSE 응답
+async def get_stream_response(request, payload):
+    chatbot = request.app.state.chatbot
+    loop = asyncio.get_event_loop()
+
+    # 프롬프트 생성 (동기 → 비동기)
+    prompt = await loop.run_in_executor(
+        None, chatbot.make_stream_prompt, payload.question, 5
+    )
+
+    client = chatbot.get_client()
+    stream = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.4,
+        max_tokens=1024,
+        stream=True,
+    )
+
+    queue = asyncio.Queue()
+
+    def lookahead_iter(iterator):
+        """마지막 여부를 알려주는 제너레이터 (yield (is_last, item))"""
+        it = iter(iterator)
+        try:
+            prev = next(it)
+        except StopIteration:
+            return
+
+        for val in it:
+            yield False, prev
+            prev = val
+        yield True, prev  # 마지막
+
+    last_sent = False  # 마지막 true가 나갔는지 추적
+
+    def produce_chunks():
+        nonlocal last_sent
+        idx = 0  # 인덱스 추가
+        try:
+            for is_last, chunk in lookahead_iter(stream):
+                delta = chunk.choices[0].delta
+                content = getattr(delta, "content", None)
+
+                if content:
+                    data = {
+                        "client_id": payload.client_id,
+                        "content": content,
+                        "is_last": is_last,
+                        "index": idx,  # 인덱스 부여
+                    }
+                    idx += 1  # 인덱스 증가
+                    if is_last:
+                        last_sent = True
+
+                    send_to_redis_async(data)
+                    msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                    asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
+        finally:
+            # 혹시 마지막 is_last가 안 나갔으면 강제로 전송
+            if not last_sent:
+                data = {
+                    "client_id": payload.client_id,
+                    "content": "",  # 또는 None
+                    "is_last": True,
+                    "index": idx,  # 마지막 인덱스
+                }
+                send_to_redis_async(data)
+                msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
+
+            asyncio.run_coroutine_threadsafe(queue.put(None), loop)
+
+    # 백그라운드로 실행
+    loop.run_in_executor(None, produce_chunks)
+
+    # 비동기 스트림
+    async def event_stream():
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            yield item
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+def get_news_recommended(payload, request):
+    """
+    뉴스 본문을 임베딩하는 함수입니다.
+    """
+    news_clicked_list = payload.news_clicked_list
+    news_candidate_list = payload.news_candidate_list
+
+    model_recommend = request.app.state.model_recommend
+
+    # 추론
+    outputs = model_recommend.run(
+        None,
+        {"clicked": news_clicked_list, "candidates": news_candidate_list},
+    )
+
+    scores = outputs[0]  # [1, 5]
+    top_1 = scores[0].argsort()[::-1][:1][0]  # Top-1 추천 인덱스
+
+    # 예측 결과 (Top-3 후보 인덱스):
+    # [14  0  2 16 19 13 15  1 10  7  9  4 17  5  8  3  6 18 11 12]
+    return top_1

@@ -3,6 +3,8 @@ from schemas.model import (
     EmbeddingIn,
     EmbeddingOut,
     StockOut,
+    SimilarNewsIn,
+    SimilarNewsOut,
     SummaryOut,
     SummaryIn,
     StockIn,

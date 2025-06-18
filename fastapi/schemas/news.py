@@ -204,3 +204,16 @@ class SimilarNewsV2(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class RecommendedNewsV2(BaseModel):
+    news_id: str
+    wdate: str  # ISO format으로 주기 위해 str 처리
+    title: str
+    article: str
+    press: str
+    url: str
+    image: str
+
+    class Config:
+        orm_mode = True

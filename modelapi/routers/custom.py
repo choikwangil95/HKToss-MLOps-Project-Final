@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request, Bod
 from sqlalchemy.orm import Session
 from db.postgresql import get_db
 from schemas.model import (
+    ChatIn,
+    ChatOut,
     LdaTopicsIn,
     LdaTopicsOut,
     SimilarNewsIn,
@@ -10,6 +12,7 @@ from schemas.model import (
 from services.model import (
     get_lda_topic,
     get_news_similar_list,
+    get_stream_response,
 )
 from services.custom import (
     get_news_impact_score_service
@@ -19,6 +22,12 @@ from schemas.custom import (
     SimpleImpactResponse
 )
 
+
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+import openai
+import os
+import json
 
 router = APIRouter(
     prefix="/news",
@@ -75,6 +84,15 @@ async def get_news_summary_router(request: Request, payload: LdaTopicsIn):
 
     return {"lda_topics": lda_topics}
 
+
+@router.post(
+    "/chat/stream",
+    # response_model=ChatOut,
+    summary="뉴스 GPT 챗봇",
+    description="뉴스 GPT 챗봇",
+)
+async def chat_stream_endpoint(request: Request, payload: ChatIn):
+    return await get_stream_response(request, payload)
 
 @router.get(
     "/{news_id}/impact_score",

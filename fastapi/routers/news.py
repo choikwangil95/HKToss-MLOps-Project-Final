@@ -9,6 +9,7 @@ from schemas.news import (
     NewsOut_v2,
     NewsOut_v2_External,
     NewsOut_v2_Metadata,
+    RecommendedNewsV2,
     SimilarNews,
     Report,
     NewsStock,
@@ -25,6 +26,7 @@ from services.news import (
     get_news_detail,
     get_news_detail_v2,
     find_news_similar,
+    get_news_recommended,
     get_similar_past_reports,
     find_stock_effected,
     get_top_impact_news,
@@ -242,6 +244,22 @@ async def get_top_impact_news_api(
 
 
 @router_v2.get(
+    "/recommend",
+    response_model=list[TopNewsResponse],
+    summary="뉴스 맞춤 추천",
+    description="뉴스 맞춤 추천",
+)
+async def get_news_summary_router(
+    user_id: Optional[str] = Query(None, description="유저 고유 ID (선택)"),
+    db: Session = Depends(get_db),
+):
+    """
+    뉴스 맞춤 추천
+    """
+    return await run_in_threadpool(get_news_recommended, user_id, db)
+
+
+@router_v2.get(
     "/{news_id}",
     response_model=NewsOut_v2,
     summary="[완료] 뉴스 상세 조회",
@@ -261,7 +279,7 @@ async def news_detail(
 @router_v2.get(
     "/{news_id}/similar",
     response_model=List[SimilarNewsV2],
-    summary="뉴스 관련 과거 유사 뉴스 조회",
+    summary="[완료] 뉴스 관련 과거 유사 뉴스 조회",
     description="입력한 뉴스와 유사한 과거 뉴스를 조건에 따라 필터링하여 조회합니다.",
 )
 async def similar_news_v2(

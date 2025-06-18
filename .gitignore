@@ -7,7 +7,10 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+<<<<<<< HEAD
 pyproject.toml
+=======
+>>>>>>> develop
 .Python
 build/
 develop-eggs/
@@ -182,6 +185,14 @@ cython_debug/
 
 # 모델 파일 제외
 /fastapi/ml_models/ko-sbert-sts_model.pk
+/models/guantized_llama3/llama-3-Korean-Bllossom-8B-Q4_K_M.gguf
+/db/news_vector_db.pkl
+
+# 뉴스 데이터 제외
+datas/mk_news_with_id.csv
+
+db/merged_news_data.csv
+db/news_v2_vector_202506122113.csv
 
 # 뉴스 데이터 제외
 datas/mk_news_with_id.csv

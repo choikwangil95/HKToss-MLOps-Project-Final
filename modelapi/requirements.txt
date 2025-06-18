@@ -21,7 +21,7 @@ prometheus-client
 # Database & ORM
 sqlalchemy
 psycopg2
-# pgvector
+pgvector
 
 # dvc
 dvc[s3]
@@ -40,3 +40,12 @@ chromadb
 langchain
 langchain-community
 langchain-chroma
+
+# LLM API
+openai
+
+# HTTP
+requests
+
+redis
+

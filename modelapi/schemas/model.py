@@ -43,9 +43,14 @@ class SimilarNewsIn(BaseModel):
 
 class SimilarNewsItem(BaseModel):
     news_id: str
-    summary: str
     wdate: str
-    score: float
+    title: str
+    summary: str
+    url: Optional[str] = None
+    image: Optional[str] = None
+    stock_list: Optional[List[str]] = []
+    industry_list: Optional[List[str]] = []
+    impact_score: float
 
 
 class SimilarNewsOut(BaseModel):
@@ -58,3 +63,22 @@ class LdaTopicsIn(BaseModel):
 
 class LdaTopicsOut(BaseModel):
     lda_topics: Dict[str, float]  # 예: {"topic1": 0.15, "topic2": 0.03, ...}
+
+
+class ChatIn(BaseModel):
+    client_id: str
+    question: str
+
+
+class ChatOut(BaseModel):
+    client_id: str
+    answer: str
+
+
+class RecommendIn(BaseModel):
+    news_clicked_list: List
+    news_candidate_list: List
+
+
+class RecommendOut(BaseModel):
+    news_recommended: List
