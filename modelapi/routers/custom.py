@@ -19,13 +19,20 @@ from schemas.model import (
     RecommendOut,
     SimilarNewsIn,
     SimilarNewsOut,
+    SimilarityRequest,
+    SimilarityResponse,
+    SimilarityResult,
 )
 from services.model import (
     get_lda_topic,
+    get_news_embeddings,
     get_news_recommended,
     get_news_similar_list,
     get_stream_response,
+    compute_similarity,
 )
+import requests
+
 from services.custom import get_news_impact_score_service
 
 from schemas.custom import SimpleImpactResponse
@@ -37,6 +44,16 @@ from pydantic import BaseModel
 import openai
 import os
 import json
+from load_models import get_similarity_model
+import asyncio
+from sqlalchemy.orm import Session
+from db.postgresql import get_db
+from models.custom import (
+    NewsModel_v2_Metadata,
+    NewsModel_v2_External,
+    NewsModel_v2_Topic,
+)
+
 
 router = APIRouter(
     prefix="/news",
@@ -102,6 +119,158 @@ async def get_news_summary_router(request: Request, payload: LdaTopicsIn):
 )
 async def chat_stream_endpoint(request: Request, payload: ChatIn):
     return await get_stream_response(request, payload)
+
+
+@router.post(
+    "/similarity",
+    response_model=SimilarityResponse,
+    summary="회귀 모델 기반 뉴스 유사도 예측",
+    description="기준 뉴스 ID를 기반으로 회귀 모델이 예측한 유사도 상위 5개 뉴스 결과를 반환합니다.",
+)
+async def get_similarity_scores(
+    request: Request, payload: SimilarityRequest, db: Session = Depends(get_db)
+):
+    # 로드된 모델 가져오기
+    scalers = request.app.state.scalers
+    ae_sess = request.app.state.ae_sess
+    regressor_sess = request.app.state.regressor_sess
+
+    async def embedding_api_func(texts):
+        embeddings = await get_news_embeddings(texts, request)
+
+        print("🟡 임베딩 결과:", embeddings)
+
+        return embeddings
+
+    news_id = payload.news_id
+    news_topk_ids = payload.news_topk_ids or []
+
+    # 공통 외부변수 컬럼 정의 (news_id 제외 전부)
+    ext_cols = [
+        col.name
+        for col in NewsModel_v2_External.__table__.columns
+        if col.name != "news_id"
+    ]
+
+    # 기준 뉴스 정보 조회
+    ref_news_raw = (
+        db.query(NewsModel_v2_Metadata)
+        .filter(NewsModel_v2_Metadata.news_id == news_id)
+        .first()
+    )
+    if not ref_news_raw:
+        raise HTTPException(
+            status_code=404, detail="기준 뉴스 정보를 찾을 수 없습니다."
+        )
+    summary = ref_news_raw.summary
+
+    ref_news_external = (
+        db.query(NewsModel_v2_External)
+        .filter(NewsModel_v2_External.news_id == news_id)
+        .first()
+    )
+    if not ref_news_external:
+        raise HTTPException(
+            status_code=404, detail="기준 뉴스 외부 변수 정보를 찾을 수 없습니다."
+        )
+    extA = [getattr(ref_news_external, col) for col in ext_cols]
+
+    ref_news_topic = (
+        db.query(NewsModel_v2_Topic)
+        .filter(NewsModel_v2_Topic.news_id == news_id)
+        .first()
+    )
+    if not ref_news_topic:
+        raise HTTPException(
+            status_code=404, detail="기준 뉴스 토픽 정보를 찾을 수 없습니다."
+        )
+    topic_cols = [
+        col.name
+        for col in ref_news_topic.__table__.columns
+        if col.name.startswith("topic_")
+    ]
+    topicA = [getattr(ref_news_topic, col) for col in topic_cols]
+
+    extA_total = extA + topicA
+
+    # 유사 뉴스 정보 조회
+    topk_news_raw = (
+        db.query(NewsModel_v2_Metadata)
+        .filter(NewsModel_v2_Metadata.news_id.in_(news_topk_ids))
+        .all()
+    )
+    summary_map = {news.news_id: news.summary for news in topk_news_raw}
+    try:
+        similar_summaries = [summary_map[nid] for nid in news_topk_ids]
+    except KeyError as e:
+        raise HTTPException(
+            status_code=400, detail=f"유사 뉴스 ID {str(e)}가 DB에 존재하지 않습니다."
+        )
+
+    topk_exts = (
+        db.query(NewsModel_v2_External)
+        .filter(NewsModel_v2_External.news_id.in_(news_topk_ids))
+        .all()
+    )
+    ext_map = {ext.news_id: ext for ext in topk_exts}
+    extBs = [[getattr(ext_map[nid], col) for col in ext_cols] for nid in news_topk_ids]
+
+    topk_topics = (
+        db.query(NewsModel_v2_Topic)
+        .filter(NewsModel_v2_Topic.news_id.in_(news_topk_ids))
+        .all()
+    )
+    topic_map = {topic.news_id: topic for topic in topk_topics}
+    topicB_cols = [
+        col.name
+        for col in NewsModel_v2_Topic.__table__.columns
+        if col.name.startswith("topic_")
+    ]
+    topicBs = [
+        [getattr(topic_map[nid], col) for col in topicB_cols] for nid in news_topk_ids
+    ]
+
+    extB_total = [ext + topic for ext, topic in zip(extBs, topicBs)]
+
+    missing_ext_ids = [nid for nid in news_topk_ids if nid not in ext_map]
+    missing_topic_ids = [nid for nid in news_topk_ids if nid not in topic_map]
+
+    if missing_ext_ids:
+        raise HTTPException(
+            status_code=400, detail=f"외부 변수 없는 뉴스 ID: {missing_ext_ids}"
+        )
+    if missing_topic_ids:
+        raise HTTPException(
+            status_code=400, detail=f"토픽 변수 없는 뉴스 ID: {missing_topic_ids}"
+        )
+
+    # 유사도 점수 계산
+    results = await compute_similarity(
+        db=db,
+        summary=summary,
+        extA=extA,
+        topicA=topicA,
+        similar_summaries=similar_summaries,
+        extBs=extBs,
+        topicBs=topicBs,
+        scalers=scalers,
+        ae_sess=ae_sess,
+        regressor_sess=regressor_sess,
+        embedding_api_func=embedding_api_func,
+        ext_col_names=ext_cols,
+        topic_col_names=topic_cols,
+        news_topk_ids=news_topk_ids,
+    )
+
+    # news_id 매핑
+    news_id_map = dict(zip(similar_summaries, news_topk_ids))
+    for r in results:
+        r["news_id"] = news_id_map.get(r["summary"], "unknown")
+
+    # 유사도 score 기준 정렬
+    results.sort(key=lambda x: x["score"], reverse=True)
+
+    return SimilarityResponse(results=[SimilarityResult(**r) for r in results])
 
 
 @router.post(

@@ -91,3 +91,18 @@ class NewsModel_v2_External(Base):
     fx = Column(Float)
     bond10y = Column(Float)
     base_rate = Column(Float)
+
+class NewsModel_v2_Topic(Base):
+    __tablename__ = 'news_v2_topic'  
+
+    news_id = Column(String, primary_key=True)
+
+    topic_1 = Column(Float)
+    topic_2 = Column(Float)
+    topic_3 = Column(Float)
+    topic_4 = Column(Float)
+    topic_5 = Column(Float)
+    topic_6 = Column(Float)
+    topic_7 = Column(Float)
+    topic_8 = Column(Float)
+    topic_9 = Column(Float)

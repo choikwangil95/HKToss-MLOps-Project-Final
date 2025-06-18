@@ -4,11 +4,12 @@ from load_models import (
     NewsTossChatbot,
     get_embedding_tokenizer,
     get_lda_model,
+    get_similarity_model,
     get_recommend_model,
     get_summarize_model,
     get_ner_tokenizer,
     get_vectordb,
-    get_prediction_models,
+    get_prediction_models
 )
 from monitoring import instrumentator
 import logging
@@ -74,13 +75,6 @@ async def startup_event():
 
     logger.info("🟢 LLM 모델 로딩 완료")
 
-    logger.info("🟡 뉴스 추천 모델 불러오는 중...")
-
-    model_recommend = get_recommend_model()
-    app.state.model_recommend = model_recommend
-
-    logger.info("🟢 뉴스 모델 로딩 완료")
-
     print("🟡 예측 모델 불러오는 중...")
 
     predictor, target_scaler, group_scalers = get_prediction_models()
@@ -90,7 +84,21 @@ async def startup_event():
 
     print("🟢 예측 모델 로딩 완료")
 
+    print("🟡 [STARTUP] Similarity 모델 로딩 중...")
 
+    scalers, ae_sess, regressor_sess = get_similarity_model()
+    app.state.scalers = scalers
+    app.state.ae_sess = ae_sess
+    app.state.regressor_sess = regressor_sess
+
+    print("🟢 [DONE] Similarity 모델 로딩 완료")
+    
+    logger.info("🟡 뉴스 추천 모델 불러오는 중...")
+
+    model_recommend = get_recommend_model()
+    app.state.model_recommend = model_recommend
+
+    logger.info("🟢 뉴스 모델 로딩 완료")
 
 
 # 라우터

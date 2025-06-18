@@ -9,7 +9,7 @@ import os
 import requests
 import openai
 from dotenv import load_dotenv
-import onnxruntime as ort
+import pickle
 
 load_dotenv()
 
@@ -221,6 +221,40 @@ class NewsTossChatbot:
 
         return response.choices[0].message.content
 
+
+# 스케일러 로더: 각 파일을 딕셔너리로 읽어 들여서, 스케일링 시 변수명을 기준으로 접근할 수 있게 구성
+def load_scalers_by_group(folder_path):
+    scalers = {}
+
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.joblib'):
+            key = filename.replace('.joblib', '')
+            full_path = os.path.join(folder_path, filename)
+            obj = joblib.load(full_path)
+
+            # 버전 정보 포함된 dict일 경우 대응
+            if isinstance(obj, dict) and 'scaler' in obj:
+                scalers[key] = obj['scaler']
+            else:
+                scalers[key] = obj
+
+    return scalers
+
+# 과거 유사 뉴스 검색을 위한 모델 로딩 함수
+def get_similarity_model():
+    model_dir = 'models/'
+    scaler_dir = os.path.join(model_dir, 'scalers_grouped')
+    ae_path = os.path.join(model_dir, 'ae_encoder.onnx')
+    regressor_path = os.path.join(model_dir, 'regressor_model.onnx')
+
+    # ONNX 모델 로딩
+    ae_sess = ort.InferenceSession(ae_path)
+    regressor_sess = ort.InferenceSession(regressor_path)
+
+    # 스케일러 로딩
+    scalers = load_scalers_by_group(scaler_dir)
+
+    return scalers, ae_sess, regressor_sess
 
 def get_recommend_model():
     model_base_path = Path("models")
