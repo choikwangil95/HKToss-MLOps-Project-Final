@@ -8,8 +8,14 @@ import pandas as pd
 import numpy as np
 import httpx
 from fastapi import Request
+import os
 
-EMBEDDING_API_URL = "http://15.165.211.100:8000/plm/embedding"
+ENV = os.getenv("ENV", "local")
+
+if ENV == "local":
+    EMBEDDING_API_URL = "http://15.165.211.100:8000/plm/embedding"
+else:
+    EMBEDDING_API_URL = "http://127.0.0.1:8000/plm/embedding"
 
 def get_embedding_from_api(text: str) -> np.ndarray:
     """
