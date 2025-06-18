@@ -1172,29 +1172,25 @@ class NewsMarketPipeline:
             return []
 
 
-def get_impact_score(market_datas):
-    score_datas = [
-        {
-            "news_id": market_data["news_id"],
-            "score": max(
-                market_data["d_minus_1_date_close"],
-                market_data["d_minus_2_date_close"],
-                market_data["d_minus_3_date_close"],
-                market_data["d_minus_4_date_close"],
-                market_data["d_minus_5_date_close"],
-            )
-            - min(
-                market_data["d_minus_1_date_close"],
-                market_data["d_minus_2_date_close"],
-                market_data["d_minus_3_date_close"],
-                market_data["d_minus_4_date_close"],
-                market_data["d_minus_5_date_close"],
-            ),
-        }
-        for market_data in market_datas
-    ]
+def request_impact_score(news_id):
+    try:
+        url = f"http://15.165.211.100:8000/news/{news_id}/impact_score"
 
-    return score_datas
+        r = requests.get(url, timeout=5)
+        r.raise_for_status()
+
+        impact_score = r.json().get("impact_score", 0)
+
+        return {"news_id": news_id, "score": impact_score}
+
+    except Exception as e:
+        print(f"❌ {news_id} 실패: {e}")
+
+        return {"news_id": news_id, "score": 0}
+
+
+def get_impact_score(market_datas):
+    return [request_impact_score(md["news_id"]) for md in market_datas]
 
 
 if __name__ == "__main__":
