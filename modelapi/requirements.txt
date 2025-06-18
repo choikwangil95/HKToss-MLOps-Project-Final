@@ -46,6 +46,6 @@ openai
 
 # HTTP
 requests
-
+httpx
 redis
 
