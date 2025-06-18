@@ -8,33 +8,8 @@ import pandas as pd
 import numpy as np
 import httpx
 from fastapi import Request
-import os
+from services.model import get_news_embedding
 
-ENV = os.getenv("ENV", "local")
-
-if ENV == "local":
-    EMBEDDING_API_URL = "http://15.165.211.100:8000/plm/embedding"
-else:
-    EMBEDDING_API_URL = "http://127.0.0.1:8000/plm/embedding"
-
-def get_embedding_from_api(text: str) -> np.ndarray:
-    """
-    외부 임베딩 API를 호출하여 임베딩 벡터를 np.ndarray(float32)로 반환
-    """
-    payload = {"article": text}
-    try:
-        response = httpx.post(EMBEDDING_API_URL, json=payload, timeout=10)
-        response.raise_for_status()
-        result = response.json()
-        # 응답: {"embedding": [[...]]}
-        embedding = np.array(result["embedding"][0], dtype=np.float32)
-        # ONNX가 (1, 임베딩차원) 2차원 입력을 기대하므로, shape이 (임베딩차원,)이면 reshape
-        if embedding.ndim == 1:
-            embedding = embedding.reshape(1, -1)
-        return embedding
-    except Exception as e:
-        print(f"임베딩 API 호출 오류: {e}")
-        raise RuntimeError("임베딩 벡터 생성 실패")
     
 def create_engineered_features_complete(df: pd.DataFrame) -> pd.DataFrame:
     """특성공학 함수 - 첨부된 코드와 동일"""
@@ -108,41 +83,21 @@ def get_complete_external_cols():
 
     return external_cols, groups
 
-async def get_embedding_from_api_async(text: str) -> np.ndarray:
-    """비동기 임베딩 API 호출 - 차원 수정"""
-    # 텍스트 검증
+async def get_embedding(text: str, request) -> np.ndarray:
+    """API 대신 내부 임베딩 함수 사용 (실패 시에만 디버깅)"""
     if not text or len(text.strip()) == 0:
         raise ValueError("임베딩할 텍스트가 비어있습니다.")
-    
-    payload = {"sentences": [text.strip()]}
-    
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            response = await client.post(EMBEDDING_API_URL, json=payload)
-            response.raise_for_status()
-            result = response.json()
-            
-            # API 응답에서 임베딩 추출
-            if "embedding" in result:
-                embedding_data = result["embedding"][0]
-            elif "embedding" in result:
-                embedding_data = result["embedding"]
-            else:
-                raise RuntimeError(f"알 수 없는 응답 구조: {result}")
-            
-            embedding = np.array(embedding_data, dtype=np.float32)
-            print(f"API 임베딩 원본 형태: {embedding.shape}")
-            
-            # 중요: 2차원으로 reshape (ONNX 모델이 기대하는 형태)
-            if embedding.ndim == 1:
-                embedding = embedding.reshape(1, -1)
-                print(f"임베딩 reshape 후: {embedding.shape}")
-            
-            return embedding
-            
-        except Exception as e:
-            print(f"임베딩 API 오류: {e}")
-            raise RuntimeError(f"임베딩 벡터 생성 실패: {e}")
+
+    try:
+        embedding_list = get_news_embedding(text.strip(), request)
+        embedding = np.array(embedding_list, dtype=np.float32)
+        if embedding.ndim == 1:
+            embedding = embedding.reshape(1, -1)
+        return embedding
+
+    except Exception as e:
+        print(f"임베딩 벡터 생성 실패: {e}")
+        raise RuntimeError(f"임베딩 벡터 생성 실패: {e}")
 
 
 def apply_scaling_complete(df: pd.DataFrame, fitted_scalers: dict) -> tuple:
@@ -275,32 +230,103 @@ def get_news_data_from_db(news_id: str, db: Session) -> dict:
     print(f"DB 데이터 조회 완료: {len(result)} 필드")
     return result
 
-def predict_and_calculate_impact(data: dict, request: Request):
+# def predict_and_calculate_impact(data: dict, request: Request):
 
+#     sess = request.app.state.predictor
+#     target_scaler = request.app.state.target_scaler
+#     fitted_scalers = request.app.state.group_scalers
+
+#     """예측 및 임팩트 스코어 계산 - 첨부된 코드 기반"""
+#     print("=== 예측 시작 ===")
+    
+#     # 1. DataFrame으로 변환
+#     df = pd.DataFrame([data])
+#     print(f"입력 데이터 shape: {df.shape}")
+    
+#     # 2. 특성공학 적용
+#     df_engineered = create_engineered_features_complete(df)
+    
+#     # 3. 스케일링 적용  
+#     df_scaled, external_cols = apply_scaling_complete(df_engineered, fitted_scalers)
+    
+#     # 4. 첫 번째 행 추출
+#     row = df_scaled.iloc[0]
+    
+#     # 5. 임베딩 생성
+#     embedding = await get_embedding(row['summary'], request) 
+#     print(f"임베딩 형태: {embedding.shape}")
+
+    
+#     # 6. 외부 특성 벡터 생성
+#     external_vector = []
+#     missing_cols = []
+#     for col in external_cols:
+#         if col in row.index:
+#             external_vector.append(row[col])
+#         else:
+#             external_vector.append(0.0)
+#             missing_cols.append(col)
+    
+#     if missing_cols:
+#         print(f"누락된 컬럼들 (0으로 채움): {missing_cols}")
+    
+#     external_array = np.array([external_vector], dtype=np.float32)
+#     print(f"외부 특성 형태: {external_array.shape}")
+    
+#     # 7. ONNX 추론
+#     inputs = {"embedding": embedding, "external": external_array}
+#     raw_predictions = sess.run(None, inputs)[0]
+#     print(f"ONNX 원시 출력: {raw_predictions}")
+    
+#     # 8. 역스케일링
+#     predictions_original = target_scaler.inverse_transform(raw_predictions)
+#     predicted_closes = predictions_original[0].tolist()
+#     print(f"예측된 종가 (d+1~d+5): {predicted_closes}")
+    
+#     # 9. 과거 종가 추출
+#     historical_closes = [
+#         data['d_minus_1_date_close'],
+#         data['d_minus_2_date_close'],
+#         data['d_minus_3_date_close'],
+#         data['d_minus_4_date_close'],
+#         data['d_minus_5_date_close']
+#     ]
+#     print(f"과거 종가 (d-1~d-5): {historical_closes}")
+    
+#     # 10. impact_score 계산: d-12345 + d+12345 총 10일 종가 중 abs(max-min)
+#     all_closes = historical_closes + predicted_closes
+#     max_price = max(all_closes)
+#     min_price = min(all_closes)
+#     impact_score = round(abs(max_price - min_price),2)
+    
+#     print(f"전체 가격 범위: {min_price:.2f} ~ {max_price:.2f}")
+#     print(f"최종 impact_score: {impact_score:.6f}")
+    
+#     return predicted_closes, historical_closes, impact_score
+
+
+async def predict_and_calculate_impact(data: dict, request: Request):
     sess = request.app.state.predictor
     target_scaler = request.app.state.target_scaler
     fitted_scalers = request.app.state.group_scalers
 
-    """예측 및 임팩트 스코어 계산 - 첨부된 코드 기반"""
     print("=== 예측 시작 ===")
-    
-    # 1. DataFrame으로 변환
     df = pd.DataFrame([data])
     print(f"입력 데이터 shape: {df.shape}")
-    
+
     # 2. 특성공학 적용
     df_engineered = create_engineered_features_complete(df)
-    
+
     # 3. 스케일링 적용  
     df_scaled, external_cols = apply_scaling_complete(df_engineered, fitted_scalers)
-    
+
     # 4. 첫 번째 행 추출
     row = df_scaled.iloc[0]
-    
-    # 5. 임베딩 생성
-    embedding = get_embedding_from_api(row['summary'])
+
+    # 5. 임베딩 생성 (await 반드시 사용)
+    embedding = await get_embedding(row['summary'], request)
     print(f"임베딩 형태: {embedding.shape}")
-    
+
     # 6. 외부 특성 벡터 생성
     external_vector = []
     missing_cols = []
@@ -310,23 +336,22 @@ def predict_and_calculate_impact(data: dict, request: Request):
         else:
             external_vector.append(0.0)
             missing_cols.append(col)
-    
     if missing_cols:
         print(f"누락된 컬럼들 (0으로 채움): {missing_cols}")
-    
+
     external_array = np.array([external_vector], dtype=np.float32)
     print(f"외부 특성 형태: {external_array.shape}")
-    
+
     # 7. ONNX 추론
     inputs = {"embedding": embedding, "external": external_array}
     raw_predictions = sess.run(None, inputs)[0]
     print(f"ONNX 원시 출력: {raw_predictions}")
-    
+
     # 8. 역스케일링
     predictions_original = target_scaler.inverse_transform(raw_predictions)
     predicted_closes = predictions_original[0].tolist()
     print(f"예측된 종가 (d+1~d+5): {predicted_closes}")
-    
+
     # 9. 과거 종가 추출
     historical_closes = [
         data['d_minus_1_date_close'],
@@ -336,16 +361,16 @@ def predict_and_calculate_impact(data: dict, request: Request):
         data['d_minus_5_date_close']
     ]
     print(f"과거 종가 (d-1~d-5): {historical_closes}")
-    
-    # 10. impact_score 계산: d-12345 + d+12345 총 10일 종가 중 abs(max-min)
+
+    # 10. impact_score 계산
     all_closes = historical_closes + predicted_closes
     max_price = max(all_closes)
     min_price = min(all_closes)
-    impact_score = round(abs(max_price - min_price),2)
-    
+    impact_score = round(abs(max_price - min_price), 2)
+
     print(f"전체 가격 범위: {min_price:.2f} ~ {max_price:.2f}")
     print(f"최종 impact_score: {impact_score:.6f}")
-    
+
     return predicted_closes, historical_closes, impact_score
 
 async def get_news_impact_score_service(news_id: str, db: Session, request: Request):
@@ -358,7 +383,7 @@ async def get_news_impact_score_service(news_id: str, db: Session, request: Requ
         print(f"✓ DB 데이터 조회 완료")
         
         # 2. 예측 및 임팩트 스코어 계산
-        d_plus, d_minus, impact_score =  predict_and_calculate_impact(data, request)
+        d_plus, d_minus, impact_score =  await predict_and_calculate_impact(data, request)
         print(f"✓ 임팩트 스코어 계산 완료: {impact_score}")
         
         return d_plus, d_minus, impact_score
