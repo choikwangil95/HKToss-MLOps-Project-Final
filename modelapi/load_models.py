@@ -10,6 +10,7 @@ import requests
 import openai
 from dotenv import load_dotenv
 import pickle
+import onnxruntime as ort
 
 load_dotenv()
 
@@ -113,6 +114,28 @@ def get_lda_model():
 
     return lda_model, count_vectorizer, stopwords
 
+def get_prediction_models():
+    """
+    예측 모델과 스케일러 로딩
+    """
+    model_base_path = Path("models/saved_models")
+
+    # ONNX 추론 세션 생성
+    sess = ort.InferenceSession(
+        str(model_base_path / "predictor.onnx"),
+        providers=['CPUExecutionProvider']
+    )
+    
+    # 타겟 스케일러 로드
+    target_scaler = joblib.load(str(model_base_path / "target_scaler.joblib"))
+    
+    # 그룹별 스케일러 동적 로딩
+    fitted_scalers = {
+        i: joblib.load(str(model_base_path / f"scaler_group_{i}.joblib"))
+        for i in range(9)
+    }
+
+    return sess, target_scaler, fitted_scalers
 
 class NewsTossChatbot:
     def __init__(self):
@@ -122,7 +145,7 @@ class NewsTossChatbot:
     def get_client(self):
         return self.client
 
-    def search_similar_news(self, query_text, top_k=5):
+    def search_similar_news(self, query_text, top_k=10):
         url = "http://15.165.211.100:8000/news/similar"
         payload = {"article": query_text, "top_k": top_k}
 
@@ -132,42 +155,62 @@ class NewsTossChatbot:
 
         return similar_news
 
-    def build_prompt(self, context, question):
-        return f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-        당신은 주식 투자자를 위한 뉴스 기반 정보 어시스턴트 챗봇 '뉴스토스'입니다.
-        당신의 임무는 실시간 뉴스와 과거 유사사건 뉴스 데이터를 바탕으로,
-        - 사용자의 투자 판단에 도움이 되는 정보를 제공하고,
-        - 뉴스에서 과거 유사사건, 해당 시기의 주가 흐름, 관련 리포트의 핵심 내용을 구체적으로 찾아 인용하며,
-        - 미래 전망 질문에는 과거 사례를 근거로 신중하게 의견을 제시하는 것입니다.
+    def build_prompt(self, context, question, has_news=True):
+        if has_news:
+            return f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+            당신이 누구냐 묻는다면, "저는 과거 뉴스 정보를 바탕으로 답변해드리는 챗봇 뉴스토스입니다.😄" 라고 답하세요.
+            어떠한 질문이든 반드시 아래 예시 포맷만 출력하세요. 추가 의견, 종합 정보 등은 절대 포함하지 마세요.
 
-        답변 작성 시 반드시 다음을 지켜주세요:
-        1. 답변 내용 중 포함되는 과거 유사사건의 날짜, 사건명, 당시 주가 흐름(상승/하락/횡보 등), 주요 리포트 내용은 구체적으로 인용하세요.
-        2. 미래 전망 질문에는 과거 유사사건을 근거로 논리적인 전망을 제시하세요.
-        3. 답변 마지막에는 '⭐️투자 결과에 대한 책임은 본인에게 있습니다.⭐️'라는 안내문을 추가하세요.
-        4. 답변은 반드시 한글로, 명확하고 간결하게 작성하세요.
-        5. 제공된 검색 결과(유사도 높은 과거 뉴스, 주가 데이터, 리포트 등)만 근거로 사용하세요. 근거가 없으면 '근거가 없는데 답변해도 될까? 이건 너의 소중한 돈이 걸린 문제야 ^^;;'라고 하세요.
-        <|eot_id|><|start_header_id|>user<|end_header_id|>
-        검색 결과: {context}
-        질문: {question}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+            [답변 작성 시 반드시 다음을 지켜주세요]
+            1. 답변에는 반드시 과거 유사사건 뉴스 정보를 아래와 같은 카드 형태로 정리해 보여주세요:
+                - 날짜, 제목(하이퍼링크), 언론사, 요약, 관련 이미지(아래 예시 참고)
+                - 예시:
+                ■ [2024-11-28] "SK하이닉스, 신규 주주환원책으로 재무구조 개선 기대"
+                (https://n.news.naver.com/mnews/article/008/0005120417)
+                ▶ 언론사: 머니투데이
+                ▶ 유사도: 0.56
+                ▶ 요약: NH투자증권이 신규 주주환원 정책을 공시한 SK하이닉스에 대해...
+                ▶ 관련 이미지: <img src="https://imgnews.pstatic.net/image/008/2024/11/28/0005120417_001_20241128085813446.jpg?type=w800" alt="뉴스 이미지">
+            2. 유사 사건 뉴스 정보 외 다른 의견, 종합 안내 정보 등은 절대로 제시하지 마세요. 
 
-    def make_stream_prompt(self, question, top_k=5):
-        # top_k 뉴스 검색 및 context 생성
+            [제공된 유사 뉴스 카드]
+            {context}
+
+            [사용자 질문]
+            {question}
+            <|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+        else:
+            return f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+            유사 뉴스가 없다면, 절대로 의견이나 종합 안내 정보 등을 제시하지 말고 아래 3가지 답변 예시 중 하나로만 답변하세요:
+            - "현재 제공된 뉴스 카드 중에서는 이번 질문과 직접적으로 연결된 사례는 확인되지 않지만, 뉴스토스는 항상 최신 이슈와 다양한 데이터를 바탕으로 최선을 다해 안내해드리고 있습니다. 궁금하신 점이나 더 구체적인 관심 분야가 있다면 언제든 말씀해 주세요!"
+            - "질문하신 내용과 가장 가까운 사례를 찾기 위해 노력했지만, 이번에는 제공된 뉴스 카드 내에서 직접적인 연관 사례를 확인하기 어려웠습니다. 앞으로도 더 정확하고 풍부한 정보를 드릴 수 있도록 계속 업데이트하고 있으니, 궁금한 점이 있으시면 언제든 질문해 주세요!"
+            - "더 구체적으로 질문해주시면, 정확한 답변을 드릴 수 있습니다!"
+
+            [사용자 질문]
+            {question}
+
+            <|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+
+
+    def make_stream_prompt(self, question, top_k=10):
         similar_news = self.search_similar_news(question, top_k=top_k)
+        # 0.1 이상만 필터링
+        filtered_news = [row for row in similar_news if row.get('similarity', 0) >= 0.1]
         retrieved_infos = []
-        for similar_news_item in similar_news:
-            row = similar_news_item
+        for row in filtered_news:
             info = (
-                f"제목: {row['title']}\n"
-                f"날짜: {row['wdate']}\n"
-                f"요약: {row['summary']}\n"
-                f"기사 URL: {row['url']}\n"
-                f"이미지: {row['image']}\n"
+                f"{row['title']} ({row['url']})\n"
+                f"<img src=\"{row['image']}\" alt=\"뉴스 이미지\">\n"
+                f"{row['summary']}\n"
+                f"{row['wdate'][:10]} {row.get('press', '정보없음')}\n"
+                f"(유사도: {row.get('similarity', 0):.2f})"
             )
             retrieved_infos.append(info)
         context = "\n\n".join(retrieved_infos)
-        return self.build_prompt(context, question)
+        return self.build_prompt(context, question, has_news=bool(filtered_news))
 
-    def answer(self, question, top_k=5):
+
+    def answer(self, question, top_k=10):
         prompt = self.make_stream_prompt(question, top_k)
 
         response = self.client.chat.completions.create(
@@ -216,3 +259,13 @@ def get_similarity_model():
     embedding_api_url = "http://15.165.211.100:8000/plm/embedding"
 
     return scalers, ae_sess, regressor_sess, embedding_api_url
+
+def get_recommend_model():
+    model_base_path = Path("models")
+
+    # ONNX 세션 생성
+    model_recommend = ort.InferenceSession(
+        str(model_base_path / "two_tower_model.onnx")
+    )
+
+    return model_recommend

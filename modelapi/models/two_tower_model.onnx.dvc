@@ -1,0 +1,5 @@
+outs:
+- md5: e45f35e3365775be12db22a94df272c3
+  size: 923340
+  hash: md5
+  path: two_tower_model.onnx

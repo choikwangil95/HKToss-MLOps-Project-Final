@@ -7,3 +7,5 @@ count_vectorizer.pkl
 /tokenizer_dir
 /ae_encoder.onnx
 /regressor_model.onnx
+/saved_models
+/two_tower_model.onnx

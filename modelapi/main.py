@@ -5,9 +5,11 @@ from load_models import (
     get_embedding_tokenizer,
     get_lda_model,
     get_similarity_model,
+    get_recommend_model,
     get_summarize_model,
     get_ner_tokenizer,
     get_vectordb,
+    get_prediction_models,
 )
 from monitoring import instrumentator
 import logging
@@ -63,7 +65,7 @@ async def startup_event():
     app.state.lda_model = lda_model
     app.state.count_vectorizer = count_vectorizer
     app.state.stopwords = stopwords
-
+    
     logger.info("🟢 LDA 모델 로딩 완료")
 
     logger.info("🟡 LLM 모델 불러오는 중...")
@@ -73,16 +75,30 @@ async def startup_event():
 
     logger.info("🟢 LLM 모델 로딩 완료")
 
-    print("🟡 LLM 모델 불러오는 중...")
+    print("🟡 예측 모델 불러오는 중...")
 
-    # Regressor 모델 및 스케일러 불러오기
+    predictor, target_scaler, group_scalers = get_prediction_models()
+    app.state.predictor = predictor
+    app.state.target_scaler = target_scaler
+    app.state.group_scalers = group_scalers
+
+    print("🟢 예측 모델 로딩 완료")
+
     print("🟡 [STARTUP] Similarity 모델 로딩 중...")
+
     scalers, ae_sess, regressor_sess, embedding_api_url = get_similarity_model()
     app.state.scalers = scalers
     app.state.ae_sess = ae_sess
     app.state.regressor_sess = regressor_sess
     app.state.embedding_api_url = embedding_api_url
     print("🟢 [DONE] Similarity 모델 로딩 완료")
+    
+    logger.info("🟡 뉴스 추천 모델 불러오는 중...")
+
+    model_recommend = get_recommend_model()
+    app.state.model_recommend = model_recommend
+
+    logger.info("🟢 뉴스 모델 로딩 완료")
 
 
 # 라우터

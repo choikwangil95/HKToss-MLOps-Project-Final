@@ -20,7 +20,7 @@ prometheus-client
 
 # Database & ORM
 sqlalchemy
-psycopg2-binary
+psycopg2
 pgvector
 
 # dvc
@@ -46,6 +46,5 @@ openai
 
 # HTTP
 requests
-
 redis
 

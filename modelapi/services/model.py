@@ -140,26 +140,40 @@ def extract_ogg_economy(tokens, labels, target_label="OGG_ECONOMY"):
     return stock_list
 
 
-def get_news_embedding(text, request):
+async def get_news_embeddings(article_list, request):
     """
-    뉴스 본문을 임베딩하는 함수입니다.
+    뉴스 본문 리스트를 임베딩하는 함수입니다.
+    ONNX 모델이 배치 입력을 지원할 경우, 한 번에 추론합니다.
     """
     tokenizer = request.app.state.tokenizer_embedding
     session = request.app.state.session_embedding
 
-    # 입력 텍스트
-    tokens = tokenizer.encode(text)
-    input_ids = np.array([tokens.ids], dtype=np.int64)
-    attention_mask = np.array([[1] * len(tokens.ids)], dtype=np.int64)
+    # 1. 토큰화
+    encoded = [tokenizer.encode(x) for x in article_list]
+    input_ids = [e.ids for e in encoded]
+    attention_mask = [[1] * len(ids) for ids in input_ids]
 
-    # 추론
-    embedding = session.run(
+    # 2. 패딩 (최대 길이 기준)
+    max_len = max(len(ids) for ids in input_ids)
+    input_ids_padded = [ids + [0] * (max_len - len(ids)) for ids in input_ids]
+    attention_mask_padded = [
+        mask + [0] * (max_len - len(mask)) for mask in attention_mask
+    ]
+
+    # 3. numpy 배열로 변환
+    input_ids_np = np.array(input_ids_padded, dtype=np.int64)
+    attention_mask_np = np.array(attention_mask_padded, dtype=np.int64)
+
+    # 4. ONNX 추론
+    outputs = session.run(
         ["sentence_embedding"],
-        {"input_ids": input_ids, "attention_mask": attention_mask},
-    )[0]
+        {"input_ids": input_ids_np, "attention_mask": attention_mask_np},
+    )[
+        0
+    ]  # shape: (batch_size, hidden_dim)
 
-    # (1, 768) → List[List[float]]
-    return [[float(x) for x in embedding[0]]]
+    # 5. 반환 (List[List[float]])
+    return outputs.tolist()
 
 
 def safe_parse_list(val):
@@ -207,7 +221,7 @@ def get_news_similar_list(payload, request):
                 image=image,
                 stock_list=stock_list,
                 industry_list=industry_list,
-                impact_score=round(1 - float(score), 2),
+                similarity=round(1 - float(score), 2),
             )
         )
 
@@ -493,3 +507,27 @@ def compute_similarity(
         {'news_id': nid, 'summary': summ, 'score': float(score), 'rank': i + 1}
         for i, (summ, score, nid) in enumerate(results)
     ]
+def get_news_recommended(payload, request):
+    """
+    뉴스 후보군 추천
+    """
+    news_clicked_ids = payload.news_clicked_ids
+    news_candidate_ids = payload.news_candidate_ids
+
+    # 임베딩
+    news_clicked_list = []
+    news_candidate_list = []
+
+    # 추론
+    model_recommend = request.app.state.model_recommend
+    outputs = model_recommend.run(
+        None,
+        {"clicked": news_clicked_list, "candidates": news_candidate_list},
+    )
+
+    scores = outputs[0]  # [1, 5]
+    top_1 = scores[0].argsort()[::-1][:1][0]  # Top-1 추천 인덱스
+
+    # 예측 결과 (Top-3 후보 인덱스):
+    # [14  0  2 16 19 13 15  1 10  7  9  4 17  5  8  3  6 18 11 12]
+    return top_1
