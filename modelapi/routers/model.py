@@ -11,7 +11,7 @@ from schemas.model import (
 )
 from services.model import (
     get_lda_topic,
-    get_news_embedding,
+    get_news_embeddings,
     get_news_similar_list,
     get_news_summary,
     extract_ogg_economy,
@@ -81,18 +81,18 @@ async def get_news_embedding_router(request: Request, payload: EmbeddingIn):
     """
     뉴스 텍스트 임베딩
     """
-    article = payload.article
-    if not article:
+    articles = payload.articles
+    if not articles:
         raise HTTPException(
             status_code=400,
             detail="기사 본문이 비어있습니다. 올바른 본문을 입력해주세요.",
         )
 
-    embedding = get_news_embedding(article, request)
-    if embedding is None:
+    embeddings = get_news_embeddings(articles, request)
+    if embeddings is None:
         raise HTTPException(
             status_code=500,
             detail="임베딩 생성 중 오류가 발생했습니다. 다시 시도해주세요.",
         )
 
-    return {"embedding": embedding}
+    return {"embeddings": embeddings}

@@ -139,26 +139,40 @@ def extract_ogg_economy(tokens, labels, target_label="OGG_ECONOMY"):
     return stock_list
 
 
-def get_news_embedding(text, request):
+def get_news_embeddings(article_list, request):
     """
-    뉴스 본문을 임베딩하는 함수입니다.
+    뉴스 본문 리스트를 임베딩하는 함수입니다.
+    ONNX 모델이 배치 입력을 지원할 경우, 한 번에 추론합니다.
     """
     tokenizer = request.app.state.tokenizer_embedding
     session = request.app.state.session_embedding
 
-    # 입력 텍스트
-    tokens = tokenizer.encode(text)
-    input_ids = np.array([tokens.ids], dtype=np.int64)
-    attention_mask = np.array([[1] * len(tokens.ids)], dtype=np.int64)
+    # 1. 토큰화
+    encoded = [tokenizer.encode(x) for x in article_list]
+    input_ids = [e.ids for e in encoded]
+    attention_mask = [[1] * len(ids) for ids in input_ids]
 
-    # 추론
-    embedding = session.run(
+    # 2. 패딩 (최대 길이 기준)
+    max_len = max(len(ids) for ids in input_ids)
+    input_ids_padded = [ids + [0] * (max_len - len(ids)) for ids in input_ids]
+    attention_mask_padded = [
+        mask + [0] * (max_len - len(mask)) for mask in attention_mask
+    ]
+
+    # 3. numpy 배열로 변환
+    input_ids_np = np.array(input_ids_padded, dtype=np.int64)
+    attention_mask_np = np.array(attention_mask_padded, dtype=np.int64)
+
+    # 4. ONNX 추론
+    outputs = session.run(
         ["sentence_embedding"],
-        {"input_ids": input_ids, "attention_mask": attention_mask},
-    )[0]
+        {"input_ids": input_ids_np, "attention_mask": attention_mask_np},
+    )[
+        0
+    ]  # shape: (batch_size, hidden_dim)
 
-    # (1, 768) → List[List[float]]
-    return [[float(x) for x in embedding[0]]]
+    # 5. 반환 (List[List[float]])
+    return outputs.tolist()
 
 
 def safe_parse_list(val):

@@ -27,12 +27,12 @@ class StockOut(BaseModel):
 
 
 class EmbeddingIn(BaseModel):
-    article: str
+    articles: List[str]
 
 
 class EmbeddingOut(BaseModel):
-    embedding: List[List[float]] = Field(
-        default_factory=list, description="(1, 768) 형식의 임베딩 벡터"
+    embeddings: List[List[float]] = Field(
+        default_factory=list, description="(n, 768) 형식의 임베딩 벡터 리스트"
     )
 
 
