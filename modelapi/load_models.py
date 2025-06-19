@@ -146,24 +146,18 @@ class NewsTossChatbot:
         return self.client
 
     def search_similar_news(self, query_text, top_k=3):
-        def clean_news_id(news_id: str) -> str:
-            cleaned = news_id.strip()
-            cleaned = re.sub(r"[\u200b-\u200f\u202a-\u202e\u2060]", "", cleaned)
-            cleaned = re.sub(r"[^\w\-]", "", cleaned)
-            return cleaned
-
+        # Step 1: 첫 번째 API로 query_text 기반 가장 유사한 뉴스 1개 찾기
         first_url = "http://15.165.211.100:8000/news/similar"
         response = requests.post(first_url, json={"article": query_text, "top_k": 1})
         response.raise_for_status()
         top_news = response.json()["similar_news_list"][0]
-        
-        news_id = clean_news_id(top_news["news_id"])
-        print(f"[DEBUG] cleaned news_id: {repr(news_id)}")
+        news_id = top_news["news_id"]
 
-        second_url = f"http://3.37.207.16:8000/news_v2/{news_id}/similar?top_k={top_k}"
+        # Step 2: 해당 news_id를 두 번째 API에 넣어서 유사 뉴스 top_k개 가져오기
+        second_url = f"http://3.37.207.16:8000/news/v2/{news_id}/similar?top_k={top_k}"
         response = requests.get(second_url)
         response.raise_for_status()
-        similar_news = response.json()["similar_news_list"]
+        similar_news = response.json()
 
         return similar_news
 
@@ -191,7 +185,7 @@ class NewsTossChatbot:
 
                 2. 유사 사건 뉴스 카드 외에, **절대로 해석이나 종합 정보는 제공하지 마세요.**
 
-                3. 답변 마지막에는 한줄 띄우고 꼭 다음 문장과 함께 답변 내용과 연관 질문을 제안해 주세요:
+                3. 답변 마지막에는 한줄 띄우고 꼭 다음 문장과 함께 답변 내용과 연관 질문을 불릿 리스트로 제안해 주세요:
                     **아래와 같은 질문도 함께 참고해 보실 수 있어요!**
 
                 ## [제공된 유사 뉴스 카드]
