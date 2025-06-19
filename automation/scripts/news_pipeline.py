@@ -660,6 +660,61 @@ def extract_industries(stock_list, code_to_industry):
     return industries
 
 
+def push_slack_news_list_with_images(news_list):
+    webhook_url = "https://hooks.slack.com/services/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"
+
+    # ✅ 블록 메시지 구성
+    blocks = []
+
+    for news in news_list:
+        try:
+            wdate = datetime.strptime(news["wdate"], "%Y-%m-%d %H:%M").strftime(
+                "%Y-%m-%d %H:%M"
+            )
+        except ValueError:
+            wdate = news["wdate"]
+
+        blocks.extend(
+            [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            f"*<{news['url']}|{news['title']}>*\n"
+                            f"{news['press']} | {wdate} | 임팩트 점수: *{news['impact_score']}*\n"
+                            f"> {news['summary']}"
+                        ),
+                    },
+                },
+                {
+                    "type": "image",
+                    "image_url": news.get("image", ""),
+                    "alt_text": "뉴스 이미지",
+                },
+                {"type": "divider"},
+            ]
+        )
+
+    message = {
+        "username": "MLOps News Bot",
+        "icon_emoji": ":newspaper:",
+        "blocks": blocks,
+    }
+
+    # ✅ 전송
+    response = requests.post(
+        webhook_url,
+        data=json.dumps(message),
+        headers={"Content-Type": "application/json"},
+    )
+
+    if response.status_code == 200:
+        print("✅ 뉴스+이미지 전송 성공")
+    else:
+        print(f"❌ 전송 실패: {response.status_code} - {response.text}")
+
+
 # ──────────────────────────────
 # 📌 뉴스 수집 메인 함수
 # ──────────────────────────────

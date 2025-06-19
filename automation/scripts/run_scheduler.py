@@ -8,6 +8,7 @@ from news_pipeline import (
     get_lda_topic,
     get_stock_list,
     load_rate_df,
+    push_slack_news_list_with_images,
     remove_market_related_sentences,
     load_official_stock_list,
     filter_official_stocks_from_list,
@@ -166,6 +167,9 @@ def job(
             update_db_impact_score(score_datas)
 
             update_db_external(score_datas)
+
+            # 슬랙 메세지 보내기
+            push_slack_news_list_with_images(ner_news)
 
     # ──────────────────────────────
     # 4 뉴스 시멘틱 피쳐 추가
