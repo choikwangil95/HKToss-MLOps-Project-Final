@@ -145,13 +145,19 @@ class NewsTossChatbot:
     def get_client(self):
         return self.client
 
-    def search_similar_news(self, query_text, top_k=10):
-        url = "http://15.165.211.100:8000/news/similar"
-        payload = {"article": query_text, "top_k": top_k}
-
-        response = requests.post(url, json=payload)
+        def search_similar_news(self, query_text, top_k=3):
+        # Step 1: 첫 번째 API로 query_text 기반 가장 유사한 뉴스 1개 찾기
+        first_url = "http://15.165.211.100:8000/news/similar"
+        response = requests.post(first_url, json={"article": query_text, "top_k": 1})
         response.raise_for_status()
-        similar_news = response.json()["similar_news_list"]
+        top_news = response.json()["similar_news_list"][0]
+        news_id = top_news["news_id"]
+
+        # Step 2: 해당 news_id를 두 번째 API에 넣어서 유사 뉴스 top_k개 가져오기
+        second_url = f"http://3.37.207.16:8000/news/v2/{news_id}/similar?top_k={top_k}"
+        response = requests.get(second_url)
+        response.raise_for_status()
+        similar_news = response.json()
 
         return similar_news
 
@@ -170,21 +176,16 @@ class NewsTossChatbot:
                         ```markdown
                         <img src="https://imgnews.pstatic.net/image/008/2024/11/28/0005120417_001_20241128085813446.jpg?type=w200" alt="뉴스 이미지">
 
-                        ▶ **제목**: [SK하이닉스, 신규 주주환원책으로 재무구조 개선 기대](https://n.news.naver.com/mnews/article/008/0005120417)  
-                        ▶ **유사도**: 0.56  
-                        ▶ **언론사**: 머니투데이  
+                        ▶ **제목**: <a href="https://n.news.naver.com/mnews/article/008/0005120417" target="_blank">SK하이닉스, 신규 주주환원책으로 재무구조 개선 기대</a><br>  
+                        ▶ **유사도**: 0.56   
                         ▶ **날짜**: 2024-11-28  
                         ▶ **요약**: NH투자증권이 신규 주주환원 정책을 공시한 SK하이닉스에 대해...
                         ```
 
                 2. 유사 사건 뉴스 카드 외에, **절대로 해석이나 종합 정보는 제공하지 마세요.**
 
-                3. 답변 마지막에는 꼭 다음 문장과 함께 연관 질문을 제안해 주세요:
-
+                3. 답변 마지막에는 한줄 띄우고 꼭 다음 문장과 함께 답변 내용과 연관 질문을 불릿 리스트로 제안해 주세요:
                     **아래와 같은 질문도 함께 참고해 보실 수 있어요!**
-                    - "과거에 SK, LG 등 대기업 계열사가 상장했을 때 모회사 주가 흐름은 어땠나요?"
-                    - "대기업에서 계열사 공모주를 준비할 때, 상장 후 주가 변동 관련된 이슈 알려줘"
-                    - "상장 첫날 따상이 예상되는데, 과거에 따상이나 따상상 사례가 있었나요?"
 
                 ## [제공된 유사 뉴스 카드]
                 {context}
@@ -197,15 +198,20 @@ class NewsTossChatbot:
                 유사 뉴스가 없다면, 아래 3가지 중 하나로만 답변하세요.  
                 **절대 종합 정보나 개인 의견을 추가하지 마세요.**
 
-                - "현재 제공된 뉴스 카드 중에서는 이번 질문과 직접적으로 연결된 사례는 확인되지 않지만, 뉴스토스는 항상 최신 이슈와 다양한 데이터를 바탕으로 최선을 다해 안내해드리고 있습니다. 궁금하신 점이나 더 구체적인 관심 분야가 있다면 언제든 말씀해 주세요!"
-                - "질문하신 내용과 가장 가까운 사례를 찾기 위해 노력했지만, 이번에는 제공된 뉴스 카드 내에서 직접적인 연관 사례를 확인하기 어려웠습니다. 앞으로도 더 정확하고 풍부한 정보를 드릴 수 있도록 계속 업데이트하고 있으니, 궁금한 점이 있으시면 언제든 질문해 주세요!"
+                - "조금 더 구체적으로 질문해주시면, 최신 이슈와 다양한 데이터를 바탕으로 최선을 다해 답변해드릴게요!"
+                - "직접적인 연관 사례를 확인하려면, 더 구체적으로 질문해주세요. ☺️"
                 - "더 구체적으로 질문해주시면, 정확한 답변을 드릴 수 있습니다!"
 
                 ## [사용자 질문]
                 {question}
                 <|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
 
+<<<<<<< HEAD
     def make_stream_prompt(self, question, top_k=10):
+=======
+
+    def make_stream_prompt(self, question, top_k=3):
+>>>>>>> 1d3f91b (chatbot modified and recommendation code)
         similar_news = self.search_similar_news(question, top_k=top_k)
         # 0.1 이상만 필터링
         filtered_news = [row for row in similar_news if row.get("similarity", 0) >= 0.1]
@@ -215,14 +221,19 @@ class NewsTossChatbot:
                 f"{row['title']} ({row['url']})\n"
                 f"<img src=\"{row['image']}\" alt=\"뉴스 이미지\">\n"
                 f"{row['summary']}\n"
-                f"{row['wdate'][:10]} {row.get('press', '정보없음')}\n"
+                f"{row['wdate'][:10]}\n"
                 f"(유사도: {row.get('similarity', 0):.2f})"
             )
             retrieved_infos.append(info)
         context = "\n\n".join(retrieved_infos)
         return self.build_prompt(context, question, has_news=bool(filtered_news))
+    
 
+<<<<<<< HEAD
     def answer(self, question, top_k=10):
+=======
+    def answer(self, question, top_k=3):
+>>>>>>> 1d3f91b (chatbot modified and recommendation code)
         prompt = self.make_stream_prompt(question, top_k)
 
         response = self.client.chat.completions.create(
