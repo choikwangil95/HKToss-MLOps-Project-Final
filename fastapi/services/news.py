@@ -49,7 +49,7 @@ def get_news_list_v2(
     skip: int = 0,
     limit: int = 20,
     title: Optional[str] = None,
-    stock_list: Optional[List[Dict[str, str]]] = None,  # ✅ stock_id, stock_name 포함
+    stock_list: Optional[List[str]] = None,
     start_datetime: Optional[datetime] = None,
     end_datetime: Optional[datetime] = None,
 ):
@@ -62,14 +62,12 @@ def get_news_list_v2(
     if end_datetime:
         query = query.filter(NewsModel_v2.wdate <= end_datetime)
 
-    # ✅ stock_list 내부의 stock_id만 추출하여 JSONB contains로 필터링
     if stock_list:
-        stock_ids = [item["stock_id"] for item in stock_list if "stock_id" in item]
         stock_conditions = [
-            cast(NewsModel_v2_Metadata.stock_list_view, JSONB).contains(
+            cast(NewsModel_v2_Metadata.stock_list, JSONB).contains(
                 [{"stock_id": stock_id}]
             )
-            for stock_id in stock_ids
+            for stock_id in stock_list
         ]
         if stock_conditions:
             subquery = (
@@ -345,14 +343,12 @@ def get_top_impact_news(
     )
 
     # 종목 필터링 (JSONB contains 방식)
-    # ✅ stock_list 내부의 stock_id만 추출하여 JSONB contains로 필터링
     if stock_list:
-        stock_ids = [item["stock_id"] for item in stock_list if "stock_id" in item]
         stock_conditions = [
-            cast(NewsModel_v2_Metadata.stock_list_view, JSONB).contains(
+            cast(NewsModel_v2_Metadata.stock_list, JSONB).contains(
                 [{"stock_id": stock_id}]
             )
-            for stock_id in stock_ids
+            for stock_id in stock_list
         ]
         if stock_conditions:
             subquery = (
