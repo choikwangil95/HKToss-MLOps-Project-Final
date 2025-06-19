@@ -492,6 +492,56 @@ def update_db_impact_score(score_datas):
             pass
 
 
+def update_db_external(score_datas):
+    if not score_datas:
+        log.info("업데이트할 데이터 없음")
+        return
+
+    update_query = """
+        UPDATE news_v2_external
+        SET d_plus_1_date_close = %s,
+            d_plus_2_date_close = %s,
+            d_plus_3_date_close = %s,
+            d_plus_4_date_close = %s,
+            d_plus_5_date_close = %s
+        WHERE news_id = %s;
+    """
+
+    values = [
+        (
+            data["d_plus"][0],
+            data["d_plus"][1],
+            data["d_plus"][2],
+            data["d_plus"][3],
+            data["d_plus"][4],
+            data["news_id"],
+        )
+        for data in score_datas
+    ]
+
+    try:
+        DB_URL = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db"
+        )
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor()
+
+        execute_batch(cur, update_query, values)
+        conn.commit()
+
+        log.info(f"🧾 External 업데이트 완료: {len(values)}건")
+
+    except Exception as e:
+        log.error(f"❌ External 업데이트 오류 ({type(e).__name__}): {e}")
+
+    finally:
+        try:
+            cur.close()
+            conn.close()
+        except:
+            pass
+
+
 # ──────────────────────────────
 # 📌 뉴스 수집 메인 함수
 # ──────────────────────────────

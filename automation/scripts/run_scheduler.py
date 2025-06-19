@@ -19,6 +19,7 @@ from news_pipeline import (
     save_to_db,
     save_to_db_topics,
     send_to_redis,
+    update_db_external,
     update_db_impact_score,
 )
 import schedule
@@ -154,17 +155,17 @@ def job(
             # ner_news에 score 추가
             # 리스트 → 딕셔너리로 변환
             score_map = {d["news_id"]: d["score"] for d in score_datas}
-            d_plus_map = {d["news_id"]: d["d_plus"] for d in score_datas}
 
             # ner_news에 score 추가
             for item in ner_news:
                 news_id = item.get("news_id")
                 item["impact_score"] = score_map.get(news_id, 0.0)
-                item["d_plus"] = d_plus_map.get(news_id, 0.0)
 
             send_to_redis(ner_news)
 
             update_db_impact_score(score_datas)
+
+            update_db_external(score_datas)
 
     # ──────────────────────────────
     # 4 뉴스 시멘틱 피쳐 추가
