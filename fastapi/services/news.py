@@ -13,7 +13,7 @@ from schemas.news import News, NewsOut_v2_External, SimilarNewsV2
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 import numpy as np
-from typing import Optional, List
+from typing import Optional, List, Dict
 import datetime
 import json
 import ast
@@ -49,7 +49,7 @@ def get_news_list_v2(
     skip: int = 0,
     limit: int = 20,
     title: Optional[str] = None,
-    stock_list: Optional[List[str]] = None,
+    stock_list: Optional[List[Dict[str, str]]] = None,  # ✅ stock_id, stock_name 포함
     start_datetime: Optional[datetime] = None,
     end_datetime: Optional[datetime] = None,
 ):
@@ -62,13 +62,14 @@ def get_news_list_v2(
     if end_datetime:
         query = query.filter(NewsModel_v2.wdate <= end_datetime)
 
-    # 종목 필터링 - JSONB contains 사용
+    # ✅ stock_list 내부의 stock_id만 추출하여 JSONB contains로 필터링
     if stock_list:
+        stock_ids = [item["stock_id"] for item in stock_list if "stock_id" in item]
         stock_conditions = [
             cast(NewsModel_v2_Metadata.stock_list_view, JSONB).contains(
                 [{"stock_id": stock_id}]
             )
-            for stock_id in stock_list
+            for stock_id in stock_ids
         ]
         if stock_conditions:
             subquery = (
@@ -344,15 +345,22 @@ def get_top_impact_news(
     )
 
     # 종목 필터링 (JSONB contains 방식)
+    # ✅ stock_list 내부의 stock_id만 추출하여 JSONB contains로 필터링
     if stock_list:
+        stock_ids = [item["stock_id"] for item in stock_list if "stock_id" in item]
         stock_conditions = [
-            cast(NewsModel_v2_Metadata.stock_list, JSONB).contains(
+            cast(NewsModel_v2_Metadata.stock_list_view, JSONB).contains(
                 [{"stock_id": stock_id}]
             )
-            for stock_id in stock_list
+            for stock_id in stock_ids
         ]
         if stock_conditions:
-            query = query.filter(or_(*stock_conditions))
+            subquery = (
+                db.query(NewsModel_v2_Metadata.news_id)
+                .filter(or_(*stock_conditions))
+                .subquery(name="matched_news_ids")
+            )
+            query = query.filter(NewsModel_v2.news_id.in_(subquery))
 
     # 정렬 및 결과 추출
     results = (
@@ -543,6 +551,8 @@ def get_news_recommended(user_id, db):
     )
 
     # 유저 뉴스 로그 가져오기
+    # - 없으면 -> 유저 정보 불러와
+    # -
 
     # 추천 모델 호출하기
 

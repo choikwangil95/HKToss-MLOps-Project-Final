@@ -48,8 +48,8 @@ class SimilarNewsItem(BaseModel):
     summary: str
     url: Optional[str] = None
     image: Optional[str] = None
-    stock_list: Optional[List[dict]] = []
-    industry_list: Optional[List[dict]] = []
+    stock_list: Optional[List[Dict[str, str]]] = []
+    industry_list: Optional[List[Dict[str, str]]] = []
     similarity: float
 
 
