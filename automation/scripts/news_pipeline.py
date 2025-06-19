@@ -447,12 +447,27 @@ def update_db_impact_score(score_datas):
 
     update_query = """
         UPDATE news_v2_metadata
-        SET impact_score = %s
+        SET impact_score = %s,
+            d_plus_1_date_close = %s,
+            d_plus_2_date_close = %s,
+            d_plus_3_date_close = %s,
+            d_plus_4_date_close = %s,
+            d_plus_5_date_close = %s
         WHERE news_id = %s;
     """
 
-    # values는 (impact_score, news_id) 순서
-    values = [(data["score"], data["news_id"]) for data in score_datas]
+    values = [
+        (
+            data["score"],
+            data["d_plus"][0],
+            data["d_plus"][1],
+            data["d_plus"][2],
+            data["d_plus"][3],
+            data["d_plus"][4],
+            data["news_id"],
+        )
+        for data in score_datas
+    ]
 
     try:
         DB_URL = os.getenv(
@@ -1179,14 +1194,15 @@ def request_impact_score(news_id):
         r = requests.get(url, timeout=5)
         r.raise_for_status()
 
+        d_plus = r.json().get("d_plus", [])
         impact_score = r.json().get("impact_score", 0)
 
-        return {"news_id": news_id, "score": impact_score}
+        return {"news_id": news_id, "score": impact_score, "d_plus": d_plus}
 
     except Exception as e:
         print(f"❌ {news_id} 실패: {e}")
 
-        return {"news_id": news_id, "score": 0}
+        return {"news_id": news_id, "score": 0, "d_plus": []}
 
 
 def get_impact_score(market_datas):

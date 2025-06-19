@@ -154,11 +154,13 @@ def job(
             # ner_news에 score 추가
             # 리스트 → 딕셔너리로 변환
             score_map = {d["news_id"]: d["score"] for d in score_datas}
+            d_plus_map = {d["news_id"]: d["d_plus"] for d in score_datas}
 
             # ner_news에 score 추가
             for item in ner_news:
                 news_id = item.get("news_id")
                 item["impact_score"] = score_map.get(news_id, 0.0)
+                item["d_plus"] = d_plus_map.get(news_id, 0.0)
 
             send_to_redis(ner_news)
 
