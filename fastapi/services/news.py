@@ -478,7 +478,7 @@ def find_news_similar_v2(
     summary_map = {
         item["news_id"]: {
             "summary": item["summary"],
-            "similarity": item["score"],
+            "similarity": item.get("score") or item.get("similarity"),
         }
         for item in similar_news_reranked_list
     }
