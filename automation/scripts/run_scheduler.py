@@ -18,6 +18,7 @@ from news_pipeline import (
     save_to_db_metadata,
     get_news_deduplicate_by_title,
     save_to_db,
+    save_to_db_similar,
     save_to_db_topics,
     send_to_redis,
     update_db_external,
@@ -137,6 +138,8 @@ def job(
     save_to_db(ner_news)
 
     save_to_db_metadata(ner_news)
+
+    save_to_db_similar(ner_news)
 
     # ──────────────────────────────
     # 3 뉴스 경제 및 행동 지표 피쳐 추가
