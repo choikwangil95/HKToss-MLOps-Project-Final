@@ -202,7 +202,9 @@ def get_news_similar_list(payload, request):
     seen_titles = set()
 
     for doc, score in results:
-        if score < 0.1:
+        similarity = round(1 - float(score), 2)
+
+        if similarity > 0.9:
             continue  # 유사도가 너무 높으면 제외 (0.9 이상 필터링)
 
         title = doc.metadata.get("title")
@@ -231,7 +233,7 @@ def get_news_similar_list(payload, request):
                 image=image,
                 stock_list=stock_list,
                 industry_list=industry_list,
-                similarity=round(1 - float(score), 2),
+                similarity=similarity,
             )
         )
 
