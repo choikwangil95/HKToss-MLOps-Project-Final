@@ -453,6 +453,8 @@ def find_news_similar_v2(
     except Exception as e:
         print(f"❌ 유사 뉴스 Rerank API 요청 실패: {e}")
         print(f"텍스트 유사도만 조회하도록 합니다.: {e}")
+
+        similar_news_reranked_list = filtered_output
         # return []
 
     # filtered_output = []
