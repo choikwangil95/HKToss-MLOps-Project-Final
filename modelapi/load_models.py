@@ -170,8 +170,7 @@ class NewsTossChatbot:
                         <img src="https://imgnews.pstatic.net/image/008/2024/11/28/0005120417_001_20241128085813446.jpg?type=w200" alt="뉴스 이미지">
 
                         ▶ **제목**: <a href="https://n.news.naver.com/mnews/article/008/0005120417" target="_blank">SK하이닉스, 신규 주주환원책으로 재무구조 개선 기대</a><br>  
-                        ▶ **유사도**: 0.56  
-                        ▶ **언론사**: 머니투데이  
+                        ▶ **유사도**: 0.56   
                         ▶ **날짜**: 2024-11-28  
                         ▶ **요약**: NH투자증권이 신규 주주환원 정책을 공시한 SK하이닉스에 대해...
                         ```
@@ -214,7 +213,7 @@ class NewsTossChatbot:
                 f"{row['title']} ({row['url']})\n"
                 f"<img src=\"{row['image']}\" alt=\"뉴스 이미지\">\n"
                 f"{row['summary']}\n"
-                f"{row['wdate'][:10]} {row['press']}\n"
+                f"{row['wdate'][:10]}"
                 f"(유사도: {row.get('similarity', 0):.2f})"
             )
             retrieved_infos.append(info)
