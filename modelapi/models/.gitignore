@@ -9,3 +9,4 @@ count_vectorizer.pkl
 /regressor_model.onnx
 /saved_models
 /two_tower_model.onnx
+/lgbm_model.pkl
