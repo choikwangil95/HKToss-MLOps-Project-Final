@@ -10,6 +10,7 @@ import requests
 import openai
 from dotenv import load_dotenv
 import pickle
+import re
 
 load_dotenv()
 
@@ -144,15 +145,28 @@ class NewsTossChatbot:
     def get_client(self):
         return self.client
 
-    def search_similar_news(self, query_text, top_k=10):
-        url = "http://15.165.211.100:8000/news/similar"
-        payload = {"article": query_text, "top_k": top_k}
+    def search_similar_news(self, query_text, top_k=3):
+        def clean_news_id(news_id: str) -> str:
+            cleaned = news_id.strip()
+            cleaned = re.sub(r"[\u200b-\u200f\u202a-\u202e\u2060]", "", cleaned)
+            cleaned = re.sub(r"[^\w\-]", "", cleaned)
+            return cleaned
 
-        response = requests.post(url, json=payload)
+        first_url = "http://15.165.211.100:8000/news/similar"
+        response = requests.post(first_url, json={"article": query_text, "top_k": 1})
+        response.raise_for_status()
+        top_news = response.json()["similar_news_list"][0]
+        
+        news_id = clean_news_id(top_news["news_id"])
+        print(f"[DEBUG] cleaned news_id: {repr(news_id)}")
+
+        second_url = f"http://3.37.207.16:8000/news_v2/{news_id}/similar?top_k={top_k}"
+        response = requests.get(second_url)
         response.raise_for_status()
         similar_news = response.json()["similar_news_list"]
 
         return similar_news
+
 
     def build_prompt(self, context, question, has_news=True):
         if has_news:
@@ -177,11 +191,8 @@ class NewsTossChatbot:
 
                 2. 유사 사건 뉴스 카드 외에, **절대로 해석이나 종합 정보는 제공하지 마세요.**
 
-                3. 답변 마지막에는 한줄 띄우고 꼭 다음 문장과 함께 연관 질문을 제안해 주세요:
+                3. 답변 마지막에는 한줄 띄우고 꼭 다음 문장과 함께 답변 내용과 연관 질문을 제안해 주세요:
                     **아래와 같은 질문도 함께 참고해 보실 수 있어요!**
-                    - "과거에 SK, LG 등 대기업 계열사가 상장했을 때 모회사 주가 흐름은 어땠나요?"
-                    - "대기업에서 계열사 공모주를 준비할 때, 상장 후 주가 변동 관련된 이슈 알려줘"
-                    - "상장 첫날 따상이 예상되는데, 과거에 따상이나 따상상 사례가 있었나요?"
 
                 ## [제공된 유사 뉴스 카드]
                 {context}
@@ -203,7 +214,7 @@ class NewsTossChatbot:
                 <|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
 
 
-    def make_stream_prompt(self, question, top_k=10):
+    def make_stream_prompt(self, question, top_k=3):
         similar_news = self.search_similar_news(question, top_k=top_k)
         # 0.1 이상만 필터링
         filtered_news = [row for row in similar_news if row.get('similarity', 0) >= 0.1]
@@ -213,7 +224,7 @@ class NewsTossChatbot:
                 f"{row['title']} ({row['url']})\n"
                 f"<img src=\"{row['image']}\" alt=\"뉴스 이미지\">\n"
                 f"{row['summary']}\n"
-                f"{row['wdate'][:10]}"
+                f"{row['wdate'][:10]}\n"
                 f"(유사도: {row.get('similarity', 0):.2f})"
             )
             retrieved_infos.append(info)
@@ -221,7 +232,7 @@ class NewsTossChatbot:
         return self.build_prompt(context, question, has_news=bool(filtered_news))
     
 
-    def answer(self, question, top_k=10):
+    def answer(self, question, top_k=3):
         prompt = self.make_stream_prompt(question, top_k)
 
         response = self.client.chat.completions.create(
