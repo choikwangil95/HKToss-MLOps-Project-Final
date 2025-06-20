@@ -145,7 +145,7 @@ class NewsTossChatbot:
     def get_client(self):
         return self.client
 
-        def search_similar_news(self, query_text, top_k=3):
+    def search_similar_news(self, query_text, top_k=3):
         # Step 1: 첫 번째 API로 query_text 기반 가장 유사한 뉴스 1개 찾기
         first_url = "http://15.165.211.100:8000/news/similar"
         response = requests.post(first_url, json={"article": query_text, "top_k": 1})
@@ -206,12 +206,7 @@ class NewsTossChatbot:
                 {question}
                 <|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
 
-<<<<<<< HEAD
-    def make_stream_prompt(self, question, top_k=10):
-=======
-
     def make_stream_prompt(self, question, top_k=3):
->>>>>>> 1d3f91b (chatbot modified and recommendation code)
         similar_news = self.search_similar_news(question, top_k=top_k)
         # 0.1 이상만 필터링
         filtered_news = [row for row in similar_news if row.get("similarity", 0) >= 0.1]
@@ -227,13 +222,8 @@ class NewsTossChatbot:
             retrieved_infos.append(info)
         context = "\n\n".join(retrieved_infos)
         return self.build_prompt(context, question, has_news=bool(filtered_news))
-    
 
-<<<<<<< HEAD
-    def answer(self, question, top_k=10):
-=======
     def answer(self, question, top_k=3):
->>>>>>> 1d3f91b (chatbot modified and recommendation code)
         prompt = self.make_stream_prompt(question, top_k)
 
         response = self.client.chat.completions.create(
