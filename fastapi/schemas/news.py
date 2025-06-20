@@ -194,7 +194,7 @@ class TopNewsResponse(BaseModel):
 
 class SimilarNewsV2(BaseModel):
     news_id: str
-    wdate: str  # ISO format으로 주기 위해 str 처리
+    wdate: Optional[datetime]
     title: str
     press: str
     url: str
@@ -203,7 +203,7 @@ class SimilarNewsV2(BaseModel):
     similarity: float
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class RecommendedNewsV2(BaseModel):

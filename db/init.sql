@@ -227,3 +227,12 @@ CREATE TABLE IF NOT EXISTS news_v2_similar (
   CONSTRAINT fk_news_id FOREIGN KEY (news_id) REFERENCES news_v2(news_id) ON DELETE CASCADE,
   CONSTRAINT fk_sim_news_id FOREIGN KEY (sim_news_id) REFERENCES news_v2(news_id) ON DELETE CASCADE
 );
+
+DO $$
+BEGIN
+    IF (SELECT COUNT(*) FROM news_v2_similar) = 0 THEN
+        COPY news_v2_similar(news_id, sim_news_id, wdate, title, summary, press, url, image, similarity)
+        FROM '/docker-entrypoint-initdb.d/news_2023_2025_similarity.csv'
+        WITH (FORMAT csv, HEADER true);
+    END IF;
+END $$;

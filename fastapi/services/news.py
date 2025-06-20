@@ -7,8 +7,10 @@ from models.news import (
     NewsModel_v2,
     NewsModel_v2_External,
     NewsModel_v2_Metadata,
+    NewsModel_v2_Similarity,
     ReportModel,
 )
+from fastapi.responses import JSONResponse
 from schemas.news import News, NewsOut_v2_External, SimilarNewsV2
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
@@ -376,6 +378,32 @@ def get_top_impact_news(
         }
         for row in results
     ]
+
+
+def find_news_similar_v3(
+    db: Session, news_id: str, top_n: int, min_gap_days: int, min_gap_between: int
+):
+    # DB에서 정보 조회
+    results = (
+        db.query(NewsModel_v2_Similarity)
+        .filter(NewsModel_v2_Similarity.news_id == news_id)
+        .order_by(desc(NewsModel_v2_Similarity.similarity))
+        .all()
+    )
+
+    def convert(row):
+        return {
+            "news_id": row.sim_news_id,
+            "wdate": row.wdate.isoformat() if row.wdate else None,
+            "title": row.title,
+            "press": row.press,
+            "url": row.url,
+            "image": row.image,
+            "summary": row.summary,
+            "similarity": row.similarity,
+        }
+
+    return [convert(r) for r in results[:top_n]]
 
 
 def find_news_similar_v2(

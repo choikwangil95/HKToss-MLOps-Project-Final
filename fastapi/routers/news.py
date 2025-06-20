@@ -19,6 +19,7 @@ from schemas.news import (
     parse_comma_separated_stock_list,
 )
 from services.news import (
+    find_news_similar_v3,
     get_news_detail_v2_external,
     get_news_detail_v2_metadata,
     get_news_list,
@@ -284,7 +285,7 @@ async def news_detail(
 )
 async def similar_news_v2(
     news_id: str = Path(..., description="기준이 되는 뉴스 ID"),
-    top_n: int = Query(5, description="가장 유사한 뉴스 개수", ge=1, le=50),
+    top_n: int = Query(5, description="가장 유사한 뉴스 개수", ge=1, le=5),
     min_gap_days: int = Query(
         90, description="기준 뉴스와 유사 뉴스 간 최소 시간 간격 (일 단위)"
     ),
@@ -298,7 +299,7 @@ async def similar_news_v2(
     """
     try:
         result = await run_in_threadpool(
-            find_news_similar_v2, db, news_id, top_n, min_gap_days, min_gap_between
+            find_news_similar_v3, db, news_id, top_n, min_gap_days, min_gap_between
         )
         if result is None:
             return []
