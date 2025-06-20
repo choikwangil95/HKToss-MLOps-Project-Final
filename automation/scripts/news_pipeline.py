@@ -290,7 +290,7 @@ def save_to_db_similar(articles):
         insert_query = """
 		INSERT INTO news_v2_similar (news_id, sim_news_id, wdate, title, summary, press, url, image, similarity)
 		VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-		ON CONFLICT (news_id) DO NOTHING;
+		ON CONFLICT (news_id, sim_news_id) DO NOTHING;
 		"""
 
         values = [
