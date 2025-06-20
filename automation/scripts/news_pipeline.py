@@ -1363,9 +1363,9 @@ def request_impact_score(news_id):
         return {"news_id": news_id, "score": impact_score, "d_plus": d_plus}
 
     except Exception as e:
-        print(f"❌ {news_id} 실패: {e}")
+        print(f"❌ {news_id} 뉴스 중요도 예측 실패: {e}")
 
-        return {"news_id": news_id, "score": 0, "d_plus": []}
+        return {"news_id": news_id, "score": 0, "d_plus": [0, 0, 0, 0, 0]}
 
 
 def get_impact_score(market_datas):
