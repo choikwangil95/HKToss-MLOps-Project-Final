@@ -309,6 +309,37 @@ async def similar_news_v2(
 
 
 @router_v2.get(
+    "/{news_id}/similar/realtime",
+    response_model=List[SimilarNewsV2],
+    summary="[완료] 뉴스 관련 과거 유사 뉴스 조회 실시간",
+    description="입력한 뉴스와 유사한 과거 뉴스를 조건에 따라 필터링하여 조회합니다.",
+)
+async def similar_news_v2(
+    news_id: str = Path(..., description="기준이 되는 뉴스 ID"),
+    top_n: int = Query(5, description="가장 유사한 뉴스 개수", ge=1, le=5),
+    min_gap_days: int = Query(
+        90, description="기준 뉴스와 유사 뉴스 간 최소 시간 간격 (일 단위)"
+    ),
+    min_gap_between: int = Query(
+        30, description="유사 뉴스 간 최소 시간 간격 (일 단위)"
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    기준 뉴스와 유사한 과거 뉴스 목록을 반환합니다.
+    """
+    try:
+        result = await run_in_threadpool(
+            find_news_similar_v2, db, news_id, top_n, min_gap_days, min_gap_between
+        )
+        if result is None:
+            return []
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router_v2.get(
     "/{news_id}/metadata",
     response_model=NewsOut_v2_Metadata,
     summary="[완료] 뉴스 상세 메타데이터 조회",

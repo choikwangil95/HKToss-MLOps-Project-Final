@@ -270,7 +270,7 @@ def save_to_db_similar(articles):
         news_id = article["news_id"]
 
         try:
-            url = f"http://fastapi:8000/news/v2/{news_id}/similar"
+            url = f"http://fastapi:8000/news/v2/{news_id}/similar/realtime"
 
             r = requests.get(url, timeout=5)
             r.raise_for_status()
