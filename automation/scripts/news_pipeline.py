@@ -726,7 +726,10 @@ def extract_industries(stock_list, code_to_industry):
 
 
 def push_slack_news_list_with_images(news_list):
-    webhook_url = "https://hooks.slack.com/services/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"
+    webhook_url = os.getenv("WEBHOOK_URL", "")
+
+    if webhook_url == "":
+        return
 
     # ✅ 블록 메시지 구성
     blocks = []
