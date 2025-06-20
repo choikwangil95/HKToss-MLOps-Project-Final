@@ -145,7 +145,7 @@ class NewsTossChatbot:
     def get_client(self):
         return self.client
 
-    def search_similar_news(self, query_text, top_k=3):
+    def search_similar_news(self, query_text, top_k=2):
         # Step 1: 첫 번째 API로 query_text 기반 가장 유사한 뉴스 1개 찾기
         first_url = "http://15.165.211.100:8000/news/similar"
         response = requests.post(first_url, json={"article": query_text, "top_k": 1})
@@ -154,7 +154,7 @@ class NewsTossChatbot:
         news_id = top_news["news_id"]
 
         # Step 2: 해당 news_id를 두 번째 API에 넣어서 유사 뉴스 top_k개 가져오기
-        second_url = f"http://3.37.207.16:8000/news/v2/{news_id}/similar?top_k={top_k}"
+        second_url = f"http://3.37.207.16:8000/news/v2/{news_id}/similar?top_n=2"
         response = requests.get(second_url)
         response.raise_for_status()
         similar_news = response.json()
@@ -164,53 +164,64 @@ class NewsTossChatbot:
 
     def build_prompt(self, context, question, has_news=True):
         if has_news:
-            return f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-                당신이 누구냐 묻는다면, "저는 과거 뉴스 정보를 바탕으로 답변해드리는 챗봇 뉴스토스입니다.😄" 라고 답하세요.
-                아래 지침을 철저히 따라주세요. 추가 의견, 종합 정보 등은 절대 포함하지 마세요.
+            system_prompt = """당신은 과거 뉴스 정보를 바탕으로만 답변하는 전문 AI 챗봇, '뉴스토스'입니다.
+                    - "너 누구야?"라고 묻는다면: "저는 과거 뉴스 정보를 바탕으로 답변해드리는 챗봇 뉴스토스입니다.😄" 라고 대답하세요.
+                    - 아래 지침을 반드시 따르며, **절대 종합 정보나 추가 해석은 포함하지 마세요.**
 
-                ## [답변 작성 지침]
+                    ## [답변 작성 지침]
 
-                1. 답변에는 반드시 **과거 유사사건 뉴스 정보를 아래와 같은 카드 형태**로 정리해 보여주세요 (순서 고정):
-                    - 이미지는 첫 줄에 크게 표시합니다.
-                    **반드시 이미지 URL의 `type=w800`과 같이 사이즈 표시 부분을 `type=w200`으로 변경해 출력하세요.**
-                    - 그 아래에 다음 항목들을 마크다운으로 작성하세요:
+                    1. 반드시 아래와 같은 **뉴스 카드 형태**로 유사 뉴스 정보를 요약해 제시하세요 (순서 고정):
+                        - 이미지 URL의 `type=w800`을 `type=w200`으로 반드시 수정하세요.
+                        - 카드 내용은 다음 마크다운 예시처럼 작성하세요:
                         ```markdown
                         <img src="https://imgnews.pstatic.net/image/008/2024/11/28/0005120417_001_20241128085813446.jpg?type=w200" alt="뉴스 이미지">
-
                         ▶ **제목**: <a href="https://n.news.naver.com/mnews/article/008/0005120417" target="_blank">SK하이닉스, 신규 주주환원책으로 재무구조 개선 기대</a><br>  
                         ▶ **유사도**: 0.56   
                         ▶ **날짜**: 2024-11-28  
                         ▶ **요약**: NH투자증권이 신규 주주환원 정책을 공시한 SK하이닉스에 대해...
+
+                        추가적으로 궁금한 점이 있으면 언제든 질문해 주세요😉
                         ```
 
-                2. 유사 사건 뉴스 카드 외에, **절대로 해석이나 종합 정보는 제공하지 마세요.**
+                    2. 뉴스 카드 외의 해석, 예측, 종합적 의견은 **절대 포함하지 마세요.**
 
-                3. 답변 마지막에는 한줄 띄우고 꼭 다음 문장과 함께 답변 내용과 연관 질문을 불릿 리스트로 제안해 주세요:
-                    **아래와 같은 질문도 함께 참고해 보실 수 있어요!**
+                    3. 답변 마지막에 다음 문장을 반드시 추가하고, **사용자 질문과 유사한 질문을 마크다운 불릿 리스트로 2~3개 생성**하세요:
 
-                ## [제공된 유사 뉴스 카드]
-                {context}
+                    **아래와 같은 질문도 함께 참고해 보실 수 있어요.**
+                    - 사용자의 질문 주제를 유지한 채, 챗봇이 잘 대답할 수 있는 질문을 작성해야 합니다.
+                    - 의문문 구조를 따라야 하며, 주제를 벗어나지 마세요.
+                    """
 
-                ## [사용자 질문]
-                {question}
-                <|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+            user_prompt = f"""## [제공된 유사 뉴스 카드]
+                    {context}
+
+                    ## [사용자 질문]
+                    {question}"""
+
+            return [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                    ]
+
         else:
-            return f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-                유사 뉴스가 없다면, 아래 3가지 중 하나로만 답변하세요.  
-                **절대 종합 정보나 개인 의견을 추가하지 마세요.**
+            system_prompt = """당신은 과거 뉴스 기반 AI 챗봇입니다.  
+                    유사 뉴스가 없을 경우, 아래 3가지 예시 중 하나만 선택해 정중히 안내하세요.  
+                    **절대 종합 정보, 배경 설명, 개인 의견을 추가하지 마세요.**
 
-                - "조금 더 구체적으로 질문해주시면, 최신 이슈와 다양한 데이터를 바탕으로 최선을 다해 답변해드릴게요!"
-                - "직접적인 연관 사례를 확인하려면, 더 구체적으로 질문해주세요. ☺️"
-                - "더 구체적으로 질문해주시면, 정확한 답변을 드릴 수 있습니다!"
+                    - "조금 더 구체적으로 질문해주시면, 최신 이슈와 다양한 데이터를 바탕으로 최선을 다해 답변해드릴게요!"
+                    - "직접적인 연관 사례를 확인하려면, 더 구체적으로 질문해주세요. ☺️"
+                    - "더 구체적으로 질문해주시면, 정확한 답변을 드릴 수 있습니다!"
+                """
+            user_prompt = f"""## [사용자 질문]{question}"""
 
-                ## [사용자 질문]
-                {question}
-                <|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+            return [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
 
 
-    def make_stream_prompt(self, question, top_k=3):
+    def make_stream_prompt(self, question, top_k=2):
         similar_news = self.search_similar_news(question, top_k=top_k)
-        # 0.1 이상만 필터링
         filtered_news = [row for row in similar_news if row.get('similarity', 0) >= 0.1]
         retrieved_infos = []
         for row in filtered_news:
@@ -222,16 +233,16 @@ class NewsTossChatbot:
                 f"(유사도: {row.get('similarity', 0):.2f})"
             )
             retrieved_infos.append(info)
+
         context = "\n\n".join(retrieved_infos)
         return self.build_prompt(context, question, has_news=bool(filtered_news))
-    
 
-    def answer(self, question, top_k=3):
-        prompt = self.make_stream_prompt(question, top_k)
+    def answer(self, question, top_k=2):
+        messages = self.make_stream_prompt(question, top_k)
 
         response = self.client.chat.completions.create(
             model="gpt-4.1-mini",
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             temperature=0.4,
             max_tokens=1024,
         )

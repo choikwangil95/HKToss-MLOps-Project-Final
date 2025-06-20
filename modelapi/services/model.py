@@ -294,14 +294,14 @@ async def get_stream_response(request, payload):
     loop = asyncio.get_event_loop()
 
     # 프롬프트 생성 (동기 → 비동기)
-    prompt = await loop.run_in_executor(
-        None, chatbot.make_stream_prompt, payload.question, 5
+    messages = await loop.run_in_executor(
+        None, chatbot.make_stream_prompt, payload.question, 2
     )
 
     client = chatbot.get_client()
     stream = client.chat.completions.create(
         model="gpt-4.1-mini",
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
         temperature=0.4,
         max_tokens=1024,
         stream=True,
