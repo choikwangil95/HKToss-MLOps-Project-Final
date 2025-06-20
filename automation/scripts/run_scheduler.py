@@ -139,8 +139,6 @@ def job(
 
     save_to_db_metadata(ner_news)
 
-    save_to_db_similar(ner_news)
-
     # ──────────────────────────────
     # 3 뉴스 경제 및 행동 지표 피쳐 추가
     # - 주가 D+1~D+30 변동률, 금리, 환율, 기관 매매동향, 유가 등
@@ -199,6 +197,9 @@ def job(
             topic_news.append(news)
 
     save_to_db_topics(topic_news)
+
+    # 과거 유사 뉴스 미리 저장
+    save_to_db_similar(ner_news)
 
 
 if __name__ == "__main__":
