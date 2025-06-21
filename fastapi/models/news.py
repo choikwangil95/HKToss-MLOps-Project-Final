@@ -126,3 +126,17 @@ class ReportModel(Base):
     opinion = Column(String)
     report_content = Column(Text)
     embedding = Column(Vector(768))
+
+
+class NewsModel_v2_Similarity(Base):
+    __tablename__ = "news_v2_similar"
+
+    news_id = Column(String, primary_key=True)  # VARCHAR PRIMARY KEY
+    sim_news_id = Column(String, primary_key=True)  # VARCHAR PRIMARY KEY
+    wdate = Column(DateTime)  # date
+    title = Column(Text)  # title TEXT
+    summary = Column(Text)  # content TEXT
+    press = Column(Text)
+    url = Column(Text)  # url TEXT
+    image = Column(Text)
+    similarity = Column(Float)

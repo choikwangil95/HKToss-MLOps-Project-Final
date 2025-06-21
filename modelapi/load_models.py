@@ -114,6 +114,7 @@ def get_lda_model():
 
     return lda_model, count_vectorizer, stopwords
 
+
 def get_prediction_models():
     """
     예측 모델과 스케일러 로딩
@@ -122,13 +123,12 @@ def get_prediction_models():
 
     # ONNX 추론 세션 생성
     sess = ort.InferenceSession(
-        str(model_base_path / "predictor.onnx"),
-        providers=['CPUExecutionProvider']
+        str(model_base_path / "predictor.onnx"), providers=["CPUExecutionProvider"]
     )
-    
+
     # 타겟 스케일러 로드
     target_scaler = joblib.load(str(model_base_path / "target_scaler.joblib"))
-    
+
     # 그룹별 스케일러 동적 로딩
     fitted_scalers = {
         i: joblib.load(str(model_base_path / f"scaler_group_{i}.joblib"))
@@ -136,6 +136,7 @@ def get_prediction_models():
     }
 
     return sess, target_scaler, fitted_scalers
+
 
 class NewsTossChatbot:
     def __init__(self):
@@ -255,25 +256,26 @@ def load_scalers_by_group(folder_path):
     scalers = {}
 
     for filename in os.listdir(folder_path):
-        if filename.endswith('.joblib'):
-            key = filename.replace('.joblib', '')
+        if filename.endswith(".joblib"):
+            key = filename.replace(".joblib", "")
             full_path = os.path.join(folder_path, filename)
             obj = joblib.load(full_path)
 
             # 버전 정보 포함된 dict일 경우 대응
-            if isinstance(obj, dict) and 'scaler' in obj:
-                scalers[key] = obj['scaler']
+            if isinstance(obj, dict) and "scaler" in obj:
+                scalers[key] = obj["scaler"]
             else:
                 scalers[key] = obj
 
     return scalers
 
+
 # 과거 유사 뉴스 검색을 위한 모델 로딩 함수
 def get_similarity_model():
-    model_dir = 'models/'
-    scaler_dir = os.path.join(model_dir, 'scalers_grouped')
-    ae_path = os.path.join(model_dir, 'ae_encoder.onnx')
-    regressor_path = os.path.join(model_dir, 'regressor_model.onnx')
+    model_dir = "models/"
+    scaler_dir = os.path.join(model_dir, "scalers_grouped")
+    ae_path = os.path.join(model_dir, "ae_encoder.onnx")
+    regressor_path = os.path.join(model_dir, "regressor_model.onnx")
 
     # ONNX 모델 로딩
     ae_sess = ort.InferenceSession(ae_path)
@@ -283,6 +285,7 @@ def get_similarity_model():
     scalers = load_scalers_by_group(scaler_dir)
 
     return scalers, ae_sess, regressor_sess
+
 
 def get_recommend_model():
     model_base_path = Path("models")

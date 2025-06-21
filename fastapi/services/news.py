@@ -7,13 +7,15 @@ from models.news import (
     NewsModel_v2,
     NewsModel_v2_External,
     NewsModel_v2_Metadata,
+    NewsModel_v2_Similarity,
     ReportModel,
 )
+from fastapi.responses import JSONResponse
 from schemas.news import News, NewsOut_v2_External, SimilarNewsV2
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 import numpy as np
-from typing import Optional, List
+from typing import Optional, List, Dict
 import datetime
 import json
 import ast
@@ -62,10 +64,9 @@ def get_news_list_v2(
     if end_datetime:
         query = query.filter(NewsModel_v2.wdate <= end_datetime)
 
-    # 종목 필터링 - JSONB contains 사용
     if stock_list:
         stock_conditions = [
-            cast(NewsModel_v2_Metadata.stock_list_view, JSONB).contains(
+            cast(NewsModel_v2_Metadata.stock_list, JSONB).contains(
                 [{"stock_id": stock_id}]
             )
             for stock_id in stock_list
@@ -352,7 +353,12 @@ def get_top_impact_news(
             for stock_id in stock_list
         ]
         if stock_conditions:
-            query = query.filter(or_(*stock_conditions))
+            subquery = (
+                db.query(NewsModel_v2_Metadata.news_id)
+                .filter(or_(*stock_conditions))
+                .subquery(name="matched_news_ids")
+            )
+            query = query.filter(NewsModel_v2.news_id.in_(subquery))
 
     # 정렬 및 결과 추출
     results = (
@@ -374,6 +380,32 @@ def get_top_impact_news(
     ]
 
 
+def find_news_similar_v3(
+    db: Session, news_id: str, top_n: int, min_gap_days: int, min_gap_between: int
+):
+    # DB에서 정보 조회
+    results = (
+        db.query(NewsModel_v2_Similarity)
+        .filter(NewsModel_v2_Similarity.news_id == news_id)
+        .order_by(desc(NewsModel_v2_Similarity.similarity))
+        .all()
+    )
+
+    def convert(row):
+        return {
+            "news_id": row.sim_news_id,
+            "wdate": row.wdate.isoformat() if row.wdate else None,
+            "title": row.title,
+            "press": row.press,
+            "url": row.url,
+            "image": row.image,
+            "summary": row.summary,
+            "similarity": row.similarity,
+        }
+
+    return [convert(r) for r in results[:top_n]]
+
+
 def find_news_similar_v2(
     db: Session, news_id: str, top_n: int, min_gap_days: int, min_gap_between: int
 ) -> List[SimilarNewsV2]:
@@ -393,7 +425,8 @@ def find_news_similar_v2(
     ref_wdate = ref_news_raw.wdate
 
     # 기준 뉴스 텍스트 추출
-    text = ref_news_meta.summary if ref_news_meta else ref_news_raw.article[:300]
+    # text = ref_news_meta.summary if ref_news_meta else ref_news_raw.article[:300]
+    text = ref_news_raw.title + ref_news_raw.article[:300]
     if not text.strip():
         return []
 
@@ -401,7 +434,7 @@ def find_news_similar_v2(
     try:
         response = requests.post(
             "http://15.165.211.100:8000/news/similar",
-            json={"article": text, "top_k": 50},
+            json={"article": text, "top_k": 10},
         )
         response.raise_for_status()
         similar_news_list = response.json()["similar_news_list"]
@@ -409,13 +442,77 @@ def find_news_similar_v2(
         print(f"❌ 유사 뉴스 API 요청 실패: {e}")
         return []
 
+    # 필터링 조건 적용
+    min_date = ref_wdate - timedelta(days=min_gap_days)
+
+    def is_far_enough(new_date: datetime, selected_dates: List[datetime]) -> bool:
+        return all(abs((new_date - d).days) >= min_gap_between for d in selected_dates)
+
+    filtered_output = []
+    selected_dates = []
+
+    similar_news_list = sorted(
+        similar_news_list, key=lambda x: x["similarity"], reverse=True
+    )
+
+    for item in similar_news_list:
+        item_date = datetime.fromisoformat(item["wdate"])
+        if (
+            item["similarity"]
+            < 0.9
+            # and item_date <= min_date
+            # and is_far_enough(item_date, selected_dates)
+        ):
+            filtered_output.append(item)
+            selected_dates.append(item_date)
+        # if len(filtered_output) >= top_n:
+        # break
+
+    similar_news_ids = [item["news_id"] for item in filtered_output]
+    filtered_ids = [nid for nid in similar_news_ids if nid != news_id]
+
+    # 유사 뉴스 Rerank API 호출
+    try:
+        response = requests.post(
+            "http://15.165.211.100:8000/news/similarity",
+            json={
+                "news_id": ref_news_raw.news_id,
+                "news_topk_ids": filtered_ids,
+            },
+        )
+        response.raise_for_status()
+        similar_news_reranked_list = response.json()["results"]
+    except Exception as e:
+        print(f"❌ 유사 뉴스 Rerank API 요청 실패: {e}")
+        print(f"텍스트 유사도만 조회하도록 합니다.: {e}")
+
+        similar_news_reranked_list = filtered_output
+        # return []
+
+    # filtered_output = []
+    # selected_dates = []
+
+    # for item in similar_news_reranked_list:
+    #     item_date = datetime.fromisoformat(item["wdate"])
+    #     if (
+    #         item["similarity"] < 0.9
+    #         and item_date <= min_date
+    #         and is_far_enough(item_date, selected_dates)
+    #     ):
+    #         filtered_output.append(item)
+    #         selected_dates.append(item_date)
+    #     if len(filtered_output) >= top_n:
+    #         break
+
+    # similar_news_reranked_list = filtered_output
+
     # 유사 뉴스 요약 맵
     summary_map = {
         item["news_id"]: {
             "summary": item["summary"],
-            "similarity": item["similarity"],
+            "similarity": item.get("score") or item.get("similarity"),
         }
-        for item in similar_news_list
+        for item in similar_news_reranked_list
     }
 
     similar_ids = list(summary_map.keys())
@@ -452,33 +549,10 @@ def find_news_similar_v2(
                 )
             )
 
-    # 정밀 유사 뉴스 API 호출
-    
     # 유사도 높은 순 정렬
     output.sort(key=lambda x: x.similarity, reverse=True)
 
-    # 필터링 조건 적용
-    min_date = ref_wdate - timedelta(days=min_gap_days)
-
-    def is_far_enough(new_date: datetime, selected_dates: List[datetime]) -> bool:
-        return all(abs((new_date - d).days) >= min_gap_between for d in selected_dates)
-
-    filtered_output = []
-    selected_dates = []
-
-    for item in output:
-        item_date = datetime.fromisoformat(item.wdate)
-        if (
-            item.similarity < 0.9
-            and item_date <= min_date
-            and is_far_enough(item_date, selected_dates)
-        ):
-            filtered_output.append(item)
-            selected_dates.append(item_date)
-        if len(filtered_output) >= top_n:
-            break
-
-    return filtered_output
+    return output[:top_n]
 
 
 def get_news_recommended(user_id, db):
@@ -501,6 +575,8 @@ def get_news_recommended(user_id, db):
     )
 
     # 유저 뉴스 로그 가져오기
+    # - 없으면 -> 유저 정보 불러와
+    # -
 
     # 추천 모델 호출하기
 

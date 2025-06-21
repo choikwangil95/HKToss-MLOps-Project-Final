@@ -258,6 +258,71 @@ def save_to_db(articles):
             conn.close()
 
 
+def save_to_db_similar(articles):
+    if not articles:
+        log.info("저장할 뉴스 없음")
+        return
+
+    conn = None  # ✅ 먼저 None으로 초기화
+    cur = None
+
+    for article in articles:
+        news_id = article["news_id"]
+
+        try:
+            url = f"http://fastapi:8000/news/v2/{news_id}/similar/realtime"
+
+            r = requests.get(url, timeout=5)
+            r.raise_for_status()
+
+            similar_news_list = r.json()
+
+        except Exception as e:
+            print(f"❌ {news_id} 유사뉴스 조회 실패: {e}")
+
+    try:
+        DB_URL = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@db:5432/news_db"
+        )
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor()
+
+        insert_query = """
+		INSERT INTO news_v2_similar (news_id, sim_news_id, wdate, title, summary, press, url, image, similarity)
+		VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+		ON CONFLICT (news_id, sim_news_id) DO NOTHING;
+		"""
+
+        values = [
+            (
+                article["news_id"],
+                similar_news["news_id"],
+                datetime.fromisoformat(similar_news["wdate"]),
+                similar_news["title"],
+                similar_news["summary"],
+                similar_news["press"],
+                similar_news["url"],
+                similar_news["image"],
+                similar_news["similarity"],
+            )
+            for similar_news in similar_news_list
+        ]
+
+        execute_batch(cur, insert_query, values)
+        conn.commit()
+
+        log.info(f"🧾 실시간 유사 뉴스 DB 저장 완료: {len(values)}건 저장")
+
+    except Exception as e:
+        log.error(f"❌ 실시간 유사 뉴스 DB 저장 중 오류 ({type(e).__name__}): {e}")
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+
 def save_to_db_metadata(articles):
     if not articles:
         log.info("저장할 뉴스 없음")
@@ -451,8 +516,13 @@ def update_db_impact_score(score_datas):
         WHERE news_id = %s;
     """
 
-    # values는 (impact_score, news_id) 순서
-    values = [(data["score"], data["news_id"]) for data in score_datas]
+    values = [
+        (
+            data["score"],
+            data["news_id"],
+        )
+        for data in score_datas
+    ]
 
     try:
         DB_URL = os.getenv(
@@ -468,6 +538,56 @@ def update_db_impact_score(score_datas):
 
     except Exception as e:
         log.error(f"❌ Impact Score 업데이트 오류 ({type(e).__name__}): {e}")
+
+    finally:
+        try:
+            cur.close()
+            conn.close()
+        except:
+            pass
+
+
+def update_db_external(score_datas):
+    if not score_datas:
+        log.info("업데이트할 데이터 없음")
+        return
+
+    update_query = """
+        UPDATE news_v2_external
+        SET d_plus_1_date_close = %s,
+            d_plus_2_date_close = %s,
+            d_plus_3_date_close = %s,
+            d_plus_4_date_close = %s,
+            d_plus_5_date_close = %s
+        WHERE news_id = %s;
+    """
+
+    values = [
+        (
+            data["d_plus"][0],
+            data["d_plus"][1],
+            data["d_plus"][2],
+            data["d_plus"][3],
+            data["d_plus"][4],
+            data["news_id"],
+        )
+        for data in score_datas
+    ]
+
+    try:
+        DB_URL = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@localhost:5432/news_db"
+        )
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor()
+
+        execute_batch(cur, update_query, values)
+        conn.commit()
+
+        log.info(f"🧾 External 업데이트 완료: {len(values)}건")
+
+    except Exception as e:
+        log.error(f"❌ External 업데이트 오류 ({type(e).__name__}): {e}")
 
     finally:
         try:
@@ -603,6 +723,64 @@ def extract_industries(stock_list, code_to_industry):
                     }
                 )
     return industries
+
+
+def push_slack_news_list_with_images(news_list):
+    webhook_url = os.getenv("WEBHOOK_URL", "")
+
+    if webhook_url == "":
+        return
+
+    # ✅ 블록 메시지 구성
+    blocks = []
+
+    for news in news_list:
+        try:
+            wdate = datetime.strptime(news["wdate"], "%Y-%m-%d %H:%M").strftime(
+                "%Y-%m-%d %H:%M"
+            )
+        except ValueError:
+            wdate = news["wdate"]
+
+        blocks.extend(
+            [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            f"*<{news['url']}|{news['title']}>*\n"
+                            f"{news['press']} | {wdate} | 임팩트 점수: *{news['impact_score']}*\n"
+                            f"> {news['summary']}"
+                        ),
+                    },
+                },
+                {
+                    "type": "image",
+                    "image_url": news.get("image", ""),
+                    "alt_text": "뉴스 이미지",
+                },
+                {"type": "divider"},
+            ]
+        )
+
+    message = {
+        "username": "MLOps News Bot",
+        "icon_emoji": ":newspaper:",
+        "blocks": blocks,
+    }
+
+    # ✅ 전송
+    response = requests.post(
+        webhook_url,
+        data=json.dumps(message),
+        headers={"Content-Type": "application/json"},
+    )
+
+    if response.status_code == 200:
+        print("✅ 뉴스+이미지 전송 성공")
+    else:
+        print(f"❌ 전송 실패: {response.status_code} - {response.text}")
 
 
 # ──────────────────────────────
@@ -1179,14 +1357,15 @@ def request_impact_score(news_id):
         r = requests.get(url, timeout=5)
         r.raise_for_status()
 
+        d_plus = r.json().get("d_plus", [])
         impact_score = r.json().get("impact_score", 0)
 
-        return {"news_id": news_id, "score": impact_score}
+        return {"news_id": news_id, "score": impact_score, "d_plus": d_plus}
 
     except Exception as e:
-        print(f"❌ {news_id} 실패: {e}")
+        print(f"❌ {news_id} 뉴스 중요도 예측 실패: {e}")
 
-        return {"news_id": news_id, "score": 0}
+        return {"news_id": news_id, "score": 0, "d_plus": [0, 0, 0, 0, 0]}
 
 
 def get_impact_score(market_datas):
