@@ -567,8 +567,6 @@ async def get_embedding_batch(article_list, request):
             print(f"배치 {i}-{i+len(batch)} 실패: {str(e)}")
             all_embeddings.extend([None] * len(batch))
 
-        print(all_embeddings)
-
     return all_embeddings
 
 

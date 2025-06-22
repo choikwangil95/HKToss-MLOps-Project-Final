@@ -601,6 +601,9 @@ def collect_member_news_data(
     if "newsId" in click_log_df.columns:
         click_log_df = click_log_df.rename(columns={"newsId": "news_id"})
 
+    if member_id == None:
+        return [], pd.DataFrame()
+
     print(
         f"멤버 '{member_id}': {len(log_data)}개 로그, {len(unique_news_ids)}개 고유 뉴스"
     )
@@ -610,7 +613,7 @@ def collect_member_news_data(
 def get_news_recommended(user_id, db):
     # 1 사용자 클릭 뉴스 로그 가져오기
     # 파라미터 설정
-    member_id = user_id  # 또는 실제 멤버 ID
+    user_id  # 또는 실제 멤버 ID
     end_datetime = datetime.now().replace(
         hour=23, minute=59, second=59, microsecond=999999
     )
@@ -622,11 +625,12 @@ def get_news_recommended(user_id, db):
 
     # 뉴스 ID 수집
     unique_news_ids, click_log_df = collect_member_news_data(
-        member_id, start_date, end_date
+        user_id, start_date, end_date
     )
 
     # 사용자 클릭 로그 없는 경우 비슷한 유저의 클릭 뉴스 로그를 가져온다
-    if len(unique_news_ids) == 0:
+    is_user_not_exist = user_id == "" or user_id == None
+    if len(unique_news_ids) == 0 or is_user_not_exist:
         # 사용자 정보 가져오기
 
         # url = f"http://43.200.17.139:8080/api/v1/userinfo/{user_id}"
@@ -645,7 +649,7 @@ def get_news_recommended(user_id, db):
             db=db,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
-            limit=10,
+            limit=100,
             stock_list=None,
         )
 
@@ -665,8 +669,6 @@ def get_news_recommended(user_id, db):
         except Exception as e:
             print(f"API 호출 실패: {str(e)}")
             news_recomended_list = []
-
-        print(news_recomended_list)
 
         if len(news_recomended_list) == 0:
             return []
