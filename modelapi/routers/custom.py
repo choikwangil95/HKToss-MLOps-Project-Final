@@ -130,7 +130,7 @@ async def chat_stream_endpoint(request: Request, payload: ChatIn):
 async def get_similarity_scores(
     request: Request,
     payload: SimilarityRequest,
-    response=Response,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     # 로드된 모델 가져오기
