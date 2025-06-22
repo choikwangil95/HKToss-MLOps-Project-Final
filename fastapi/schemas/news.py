@@ -192,6 +192,20 @@ class TopNewsResponse(BaseModel):
         from_attributes = True
 
 
+class RecommendNewsResponse(BaseModel):
+    news_id: str
+    wdate: datetime  # 날짜+시간
+    title: str
+    summary: str
+    image: str | None  # 이미지 URL (nullable)
+    press: str | None  # 언론사 (nullable)
+    url: Optional[str]
+    click_score: float
+
+    class Config:
+        from_attributes = True
+
+
 class SimilarNewsV2(BaseModel):
     news_id: str
     wdate: Optional[datetime]

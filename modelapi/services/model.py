@@ -3,6 +3,7 @@ import re
 from konlpy.tag import Okt
 import numpy as np
 from sqlalchemy.orm import Session
+from collections import Counter
 
 from schemas.model import SimilarNewsItem
 import asyncio
@@ -10,6 +11,14 @@ from fastapi.responses import StreamingResponse
 import json
 import redis
 from concurrent.futures import ThreadPoolExecutor
+import requests
+from db.postgresql import get_db
+from models.custom import (
+    NewsModel_v2,
+    NewsModel_v2_Metadata,
+    NewsModel_v2_External,
+    NewsModel_v2_Topic,
+)
 
 import ast
 import pandas as pd
@@ -540,7 +549,62 @@ async def compute_similarity(
     ]
 
 
-def get_news_recommended(payload, request):
+async def get_embedding_batch(article_list, request):
+    """문장 리스트를 배치로 임베딩 처리"""
+    batch_size = 20
+
+    all_embeddings = []
+    for i in range(0, len(article_list), batch_size):
+        batch = article_list[i : i + batch_size]
+        try:
+            batch_news_embeddings = await get_news_embeddings(batch, request)
+            batch_embeddings = batch_news_embeddings if batch_news_embeddings else []
+            all_embeddings.extend(batch_embeddings)
+            print(f"배치 {i}-{i+len(batch)}: {len(batch_embeddings)}개 임베딩 성공")
+
+        except Exception as e:
+            print(f"배치 {i}-{i+len(batch)} 실패: {str(e)}")
+            all_embeddings.extend([None] * len(batch))
+
+        print(all_embeddings)
+
+    return all_embeddings
+
+
+def get_news_metadata_df(news_ids: list) -> pd.DataFrame:
+    """
+    뉴스 ID 목록을 받아 각 뉴스의 메타데이터를 조회하여 DataFrame으로 반환
+    :param news_ids: 뉴스 ID 문자열 리스트 (예: ['20250513_0092', '20250618_28735495'])
+    :return: 뉴스 메타데이터 DataFrame
+    """
+    API_BASE_URL = "http://3.37.207.16:8000"
+    METADATA_ENDPOINT = "/news/v2/{news_id}/metadata"
+
+    records = []
+
+    # news_ids가 유효한 리스트인지 확인
+    if not isinstance(news_ids, list) or not all(isinstance(i, str) for i in news_ids):
+        print("잘못된 news_ids 형식: 반드시 문자열 리스트여야 합니다")
+        return pd.DataFrame()
+
+    for news_id in news_ids:
+        # URL 정상 생성 확인
+        url = API_BASE_URL + METADATA_ENDPOINT.format(news_id=news_id)
+        try:
+            response = requests.get(url)
+            response.raise_for_status()  # 4xx/5xx 오류 시 예외 발생
+            meta = response.json()
+            records.append(meta)
+            print(f"{news_id} 메타데이터 조회 성공")
+        except requests.exceptions.HTTPError as e:
+            print(f"{news_id} 처리 중 HTTP 오류 ({e.response.status_code}): {e}")
+        except Exception as e:
+            print(f"{news_id} 처리 중 오류: {e}")
+
+    return pd.DataFrame(records)
+
+
+async def get_news_recommended(payload, request):
     """
     뉴스 후보군 추천
     """
@@ -548,19 +612,207 @@ def get_news_recommended(payload, request):
     news_candidate_ids = payload.news_candidate_ids
 
     # 임베딩
-    news_clicked_list = []
-    news_candidate_list = []
+    news_clicked_metadata = get_news_metadata_df(news_clicked_ids)
+    news_candidate_medatata = get_news_metadata_df(news_candidate_ids)
 
-    # 추론
-    model_recommend = request.app.state.model_recommend
-    outputs = model_recommend.run(
-        None,
-        {"clicked": news_clicked_list, "candidates": news_candidate_list},
+    news_clicked_summaries = news_clicked_metadata["summary"].tolist()
+    news_candidate_summaries = news_candidate_medatata["summary"].tolist()
+
+    news_clicked_embeddings = await get_embedding_batch(news_clicked_summaries, request)
+    news_candidate_embeddings = await get_embedding_batch(
+        news_candidate_summaries, request
     )
 
-    scores = outputs[0]  # [1, 5]
-    top_1 = scores[0].argsort()[::-1][:1][0]  # Top-1 추천 인덱스
+    # 임베딩 데이터 추출 및 전처리
+    clicked_embeddings_np = np.array(news_clicked_embeddings, dtype=np.float32)
+    candi_embeddings_np = np.array(news_candidate_embeddings, dtype=np.float32)
 
-    # 예측 결과 (Top-3 후보 인덱스):
-    # [14  0  2 16 19 13 15  1 10  7  9  4 17  5  8  3  6 18 11 12]
-    return top_1
+    # 입력 데이터 형식 조정
+    num_clicked = len(news_clicked_ids)
+    num_candidates = len(news_candidate_ids)
+
+    clicked_input = clicked_embeddings_np[:num_clicked].reshape(1, num_clicked, 768)
+    candidate_input = candi_embeddings_np[:num_candidates].reshape(
+        1, num_candidates, 768
+    )
+
+    # 추론 Step 1
+    top_k = 5  # 클릭 뉴스 별 후보 뉴스 유사 확률 top_k
+
+    # 모델 추론 실행
+    inputs = {"clicked": clicked_input, "candidates": candidate_input}
+    model_recommend = request.app.state.model_recommend
+    outputs = model_recommend.run(None, inputs)[0]
+
+    scores = outputs  # [1, 5]
+    top_indices = np.argsort(-scores, axis=2)[:, :, :top_k]
+    flattened = top_indices.squeeze(0).flatten()
+
+    # 유니크 후보군 및 등장 빈도 계산
+    unique_candidates = np.unique(flattened)
+    counts = Counter(flattened)
+
+    # [0, 2, 6, 4, ...]
+    candidate_indices = unique_candidates.tolist()
+
+    # 실제 뉴스 ID 매핑
+    top_k_news_ids = [news_candidate_ids[i] for i in candidate_indices]
+
+    # 최종 반환
+    # ['20250513_0089', '20250513_0148', '20250513_0085', ... ]
+    return top_k_news_ids
+
+
+async def get_news_recommended_ranked(payload, request, db):
+    """
+    뉴스 후보군 추천
+    """
+    # 모델 가져오기
+    model_recommend_ranker = request.app.state.model_recommend_ranker
+
+    # 사용자 정보 가져오기
+    user_id = payload.user_id
+
+    url = f"http://43.200.17.139:8080/api/v1/userinfo/{user_id}"
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        user_data = response.json()["data"]
+
+        print(f"✅ 사용자 {user_id} 정보 조회 성공")
+    except Exception as e:
+        print(f"❌ 사용자 {user_id} 정보 조회 실패: {str(e)}")
+        return []
+
+    # 뉴스 정보 가져오기
+    news_ids = payload.news_ids
+
+    # 1. 각각 테이블에서 데이터 조회
+    news_list = db.query(NewsModel_v2).filter(NewsModel_v2.news_id.in_(news_ids)).all()
+    metadata_list = (
+        db.query(NewsModel_v2_Metadata)
+        .filter(NewsModel_v2_Metadata.news_id.in_(news_ids))
+        .all()
+    )
+    external_list = (
+        db.query(NewsModel_v2_External)
+        .filter(NewsModel_v2_External.news_id.in_(news_ids))
+        .all()
+    )
+    topic_list = (
+        db.query(NewsModel_v2_Topic)
+        .filter(NewsModel_v2_Topic.news_id.in_(news_ids))
+        .all()
+    )
+
+    # 2. 각 테이블 결과를 news_id 기준 dict로 매핑
+    news_map = {row.news_id: row.__dict__ for row in news_list}
+    metadata_map = {row.news_id: row.__dict__ for row in metadata_list}
+    external_map = {row.news_id: row.__dict__ for row in external_list}
+    topic_map = {row.news_id: row.__dict__ for row in topic_list}
+
+    # 3. SQLAlchemy 내부 키 제거 (_sa_instance_state)
+    def clean_sqlalchemy_dict(d):
+        return {k: v for k, v in d.items() if k != "_sa_instance_state"}
+
+    # 4. 병합
+    merged_results = []
+
+    for news_id in news_ids:
+        row = {}
+
+        if news_id in news_map:
+            row.update(clean_sqlalchemy_dict(news_map[news_id]))
+        if news_id in metadata_map:
+            row.update(clean_sqlalchemy_dict(metadata_map[news_id]))
+        if news_id in external_map:
+            row.update(clean_sqlalchemy_dict(external_map[news_id]))
+        if news_id in topic_map:
+            row.update(clean_sqlalchemy_dict(topic_map[news_id]))
+
+        # [2] 사용자 데이터 병합
+        row.update(user_data)  # user_data는 각 row에 동일하게 적용된다고 가정
+
+        # [3] main_topic 계산
+        topic_columns = [f"topic_{i}" for i in range(1, 10)]
+        topic_values = [row.get(col) for col in topic_columns]
+
+        if any(pd.notna(val) for val in topic_values):
+            try:
+                max_topic_index = int(np.argmax(topic_values)) + 1  # 1부터 시작
+                row["main_topic"] = max_topic_index
+            except Exception:
+                row["main_topic"] = None
+        else:
+            row["main_topic"] = None
+
+        # [4] is_same_stock 계산
+        try:
+            news_stocks = {
+                stock["stock_id"] for stock in row.get("stock_list_view", [])
+            }
+            user_stocks = {stock["stockCode"] for stock in row.get("memberStocks", [])}
+            row["is_same_stock"] = 1 if news_stocks & user_stocks else 0
+        except Exception:
+            row["is_same_stock"] = 0
+
+        # [5] 병합 결과 저장
+        merged_results.append(row)
+
+    columns_to_keep = [
+        "userPnl",
+        "asset",
+        "investScore",
+        "topic_1",
+        "topic_2",
+        "topic_3",
+        "topic_4",
+        "topic_5",
+        "topic_6",
+        "topic_7",
+        "topic_8",
+        "topic_9",
+        "main_topic",
+        "is_same_stock",
+    ]
+
+    # 병합된 결과에서 필요한 컬럼만 남기기
+    filtered_results = [
+        {k: row.get(k, None) for k in columns_to_keep} for row in merged_results
+    ]
+
+    df_input = pd.DataFrame(filtered_results)
+
+    try:
+        # 클릭 확률 예측 (클래스 1에 대한 확률)
+        proba = model_recommend_ranker.predict_proba(df_input)[:, 1]
+
+        # 예측 결과를 원본 데이터프레임에 병합
+        df_pred = pd.DataFrame(merged_results)
+        df_pred["click_score"] = proba
+        df_pred = df_pred[
+            [
+                "news_id",
+                "wdate",
+                "title",
+                "summary",
+                "image",
+                "press",
+                "url",
+                "click_score",
+            ]
+        ]
+
+        # 7. 확률 기준 정렬
+        df_pred = df_pred.sort_values("click_score", ascending=False).reset_index(
+            drop=True
+        )
+
+        news_recommend_ranked_list = df_pred[:10].to_dict(orient="records")
+
+        return news_recommend_ranked_list
+
+    except Exception as e:
+        print(f"예측 중 오류 발생: {str(e)}")
+        return []

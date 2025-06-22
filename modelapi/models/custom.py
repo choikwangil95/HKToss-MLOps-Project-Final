@@ -14,6 +14,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
+
 class NewsModel_v2(Base):
     __tablename__ = "news_v2"
 
@@ -92,8 +93,9 @@ class NewsModel_v2_External(Base):
     bond10y = Column(Float)
     base_rate = Column(Float)
 
+
 class NewsModel_v2_Topic(Base):
-    __tablename__ = 'news_v2_topic'  
+    __tablename__ = "news_v2_topic"
 
     news_id = Column(String, primary_key=True)
 

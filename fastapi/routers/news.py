@@ -9,6 +9,7 @@ from schemas.news import (
     NewsOut_v2,
     NewsOut_v2_External,
     NewsOut_v2_Metadata,
+    RecommendNewsResponse,
     RecommendedNewsV2,
     SimilarNews,
     Report,
@@ -246,7 +247,7 @@ async def get_top_impact_news_api(
 
 @router_v2.get(
     "/recommend",
-    response_model=list[TopNewsResponse],
+    response_model=list[RecommendNewsResponse],
     summary="뉴스 맞춤 추천",
     description="뉴스 맞춤 추천",
 )

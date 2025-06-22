@@ -17,6 +17,8 @@ from schemas.model import (
     LdaTopicsOut,
     RecommendIn,
     RecommendOut,
+    RecommendRankedIn,
+    RecommendRankedOut,
     SimilarNewsIn,
     SimilarNewsOut,
     SimilarityRequest,
@@ -27,6 +29,7 @@ from services.model import (
     get_lda_topic,
     get_news_embeddings,
     get_news_recommended,
+    get_news_recommended_ranked,
     get_news_similar_list,
     get_stream_response,
     compute_similarity,
@@ -288,17 +291,27 @@ async def get_similarity_scores(
 
 @router.post(
     "/recommend",
-    response_model=RecommendOut,
+    response_model=list[str],
     summary="뉴스 추천 후보군",
     description="뉴스 추천 후보군",
 )
 async def get_news_recommend(request: Request, payload: RecommendIn):
-    return JSONResponse(
-        status_code=200,
-        content={"message": "🚧 현재 추천 API는 개발 중입니다. 곧 제공될 예정이에요!"},
-    )
+    return await get_news_recommended(payload, request)
 
-    # return await get_news_recommended(payload, request)
+
+@router.post(
+    "/recommend/rerank",
+    response_model=list[RecommendRankedOut],
+    summary="뉴스 추천 랭킹",
+    description="뉴스 추천 랭킹",
+)
+async def get_news_recommend(
+    request: Request,
+    payload: RecommendRankedIn,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    return await get_news_recommended_ranked(payload, request, db)
 
 
 @router.get(

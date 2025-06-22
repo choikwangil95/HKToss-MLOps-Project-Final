@@ -104,3 +104,19 @@ class RecommendIn(BaseModel):
 
 class RecommendOut(BaseModel):
     news_recommended: List
+
+
+class RecommendRankedIn(BaseModel):
+    user_id: str
+    news_ids: List
+
+
+class RecommendRankedOut(BaseModel):
+    news_id: str
+    wdate: datetime  # 날짜+시간
+    title: str
+    summary: str
+    image: str | None  # 이미지 URL (nullable)
+    press: str | None  # 언론사 (nullable)
+    url: Optional[str]
+    click_score: float
