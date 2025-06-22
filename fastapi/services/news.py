@@ -555,31 +555,156 @@ def find_news_similar_v2(
     return output[:top_n]
 
 
-def get_news_recommended(user_id, db):
+import requests
+import pandas as pd
 
-    # 날짜 범위 설정
+
+def collect_member_news_data(
+    member_id: str, start_date: str, end_date: str
+) -> (list, pd.DataFrame):  # type: ignore
+    """
+    특정 멤버의 뉴스 로그 데이터 수집
+    :param member_id: 멤버 ID (예: "anonymous", "user123")
+    :param start_date: 조회 시작 날짜 (YYYY-MM-DD)
+    :param end_date: 조회 종료 날짜 (YYYY-MM-DD)
+    :return:
+        - unique_news_ids: 중복 제거된 newsId 목록
+        - click_log_df: 원본 로그 데이터 DataFrame (news_id 컬럼 포함)
+    """
+    API_BASE_URL = "http://43.200.17.139:8080"
+    NEWS_LOGS_ENDPOINT = "/api/newsLogs"
+    url = API_BASE_URL + NEWS_LOGS_ENDPOINT
+    params = {"startDate": start_date, "endDate": end_date, "memberId": member_id}
+
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        api_response = response.json()
+    except Exception as e:
+        print(f"API 호출 실패: {str(e)}")
+        return [], pd.DataFrame()
+
+    if not api_response.get("Success", False):
+        return [], pd.DataFrame()
+
+    # 원본 데이터 추출
+    log_data = api_response.get("data", [])
+
+    # 1. 뉴스 ID 추출 및 중복 제거
+    news_ids = [log.get("newsId") for log in log_data if "newsId" in log]
+    unique_news_ids = list(set(news_ids))
+
+    # 2. 원본 로그 데이터를 DataFrame으로 변환
+    click_log_df = pd.DataFrame(log_data)
+
+    # 3. 컬럼명 변경: newsId -> news_id
+    if "newsId" in click_log_df.columns:
+        click_log_df = click_log_df.rename(columns={"newsId": "news_id"})
+
+    print(
+        f"멤버 '{member_id}': {len(log_data)}개 로그, {len(unique_news_ids)}개 고유 뉴스"
+    )
+    return unique_news_ids, click_log_df
+
+
+def get_news_recommended(user_id, db):
+    # 1 사용자 클릭 뉴스 로그 가져오기
+    # 파라미터 설정
+    member_id = user_id  # 또는 실제 멤버 ID
     end_datetime = datetime.now().replace(
         hour=23, minute=59, second=59, microsecond=999999
     )
-    start_datetime = (end_datetime - timedelta(days=7)).replace(
+    start_datetime = (end_datetime - timedelta(days=60)).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
+    start_date = start_datetime.strftime("%Y-%m-%d")
+    end_date = end_datetime.strftime("%Y-%m-%d")
 
-    # 후보 뉴스 = 최신 주요 뉴스
+    # 뉴스 ID 수집
+    unique_news_ids, click_log_df = collect_member_news_data(
+        member_id, start_date, end_date
+    )
+
+    # 사용자 클릭 로그 없는 경우 비슷한 유저의 클릭 뉴스 로그를 가져온다
+    if len(unique_news_ids) == 0:
+        # 사용자 정보 가져오기
+
+        # url = f"http://43.200.17.139:8080/api/v1/userinfo/{user_id}"
+
+        # try:
+        #     response = requests.get(url)
+        #     response.raise_for_status()
+        #     user_data = response.json()["data"]
+
+        #     print(f"✅ 사용자 {user_id} 정보 조회 성공")
+        # except Exception as e:
+        #     print(f"❌ 사용자 {user_id} 정보 조회 실패: {str(e)}")
+
+        # pass
+
+        top_news = get_top_impact_news(
+            db=db,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            limit=10,
+            stock_list=None,
+        )
+
+        return top_news
+
+    # 2 후보 뉴스 가져오기 (최신 주요 뉴스)
     top_news = get_top_impact_news(
         db=db,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
-        limit=20,
+        limit=100,
         stock_list=None,
     )
 
-    # 유저 뉴스 로그 가져오기
-    # - 없으면 -> 유저 정보 불러와
-    # -
+    # 추천 뉴스 후보군 선별 모델 호출하기
+    clicked_news_ids = unique_news_ids.copy()
+    cadidate_news_ids = [news["news_id"] for news in top_news]
 
-    # 추천 모델 호출하기
+    API_BASE_URL = "http://15.165.211.100:8000"
+    NEWS_LOGS_ENDPOINT = "/news/recomended"
+    url = API_BASE_URL + NEWS_LOGS_ENDPOINT
+    payload = {
+        "news_clicked_ids": clicked_news_ids,
+        "news_candidate_ids": cadidate_news_ids,
+    }
+
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+
+        news_recomended_candidates_ids = response.json()
+    except Exception as e:
+        print(f"API 호출 실패: {str(e)}")
+        news_recomended_candidates_ids = []
+
+    if len(news_recomended_candidates_ids) == 0:
+        return []
+
+    # 추천 뉴스 리랭킹 모델 호출하기
+    API_BASE_URL = "http://15.165.211.100:8000"
+    NEWS_LOGS_ENDPOINT = "/news/recomended/rerank"
+    url = API_BASE_URL + NEWS_LOGS_ENDPOINT
+    payload = {"user_id": user_id, "news_ids": news_recomended_candidates_ids}
+
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+
+        news_recomended_list = response.json()
+    except Exception as e:
+        print(f"API 호출 실패: {str(e)}")
+        news_recomended_list = []
+
+    if len(news_recomended_candidates_ids) == 0:
+        return []
+
+    print(news_recomended_list)
 
     # 추천 뉴스 리턴하기
 
-    return top_news
+    return news_recomended_list

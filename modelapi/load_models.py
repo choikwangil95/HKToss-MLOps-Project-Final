@@ -294,3 +294,12 @@ def get_recommend_model():
     )
 
     return model_recommend
+
+
+def get_recommend_ranker_model():
+    model_base_path = Path("models")
+
+    # ONNX 세션 생성
+    model_recommend_ranker = joblib.load(str(model_base_path / "lgbm_model2.pkl"))
+
+    return model_recommend_ranker
