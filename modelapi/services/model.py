@@ -19,6 +19,7 @@ from models.custom import (
     NewsModel_v2_External,
     NewsModel_v2_Topic,
 )
+import shap
 
 import ast
 import pandas as pd
@@ -683,7 +684,7 @@ async def get_news_recommended_ranked(payload, request, db):
         print(f"✅ 사용자 {user_id} 정보 조회 성공")
     except Exception as e:
         print(f"❌ 사용자 {user_id} 정보 조회 실패: {str(e)}")
-        return []
+        user_data = {"userPnl": 0, "asset": 0, "investScore": 0}
 
     # 뉴스 정보 가져오기
     news_ids = payload.news_ids
@@ -808,6 +809,57 @@ async def get_news_recommended_ranked(payload, request, db):
         df_pred = df_pred.sort_values("click_score", ascending=False).reset_index(
             drop=True
         )
+
+        # 5. SHAP value 계산
+        explainer = shap.TreeExplainer(model_recommend_ranker)
+        shap_values = explainer.shap_values(df_input)  # shape: [n_samples, n_features]
+
+        print(shap_values)
+
+        # 6. 상위 3개 중요 피처명 추출
+        feature_kor_map = {
+            "userPnl": "투자 수익률",
+            "asset": "자산 보유량",
+            "investScore": "투자 성향",
+            "topic_1": "글로벌 시장 동향",
+            "topic_2": "증권사 주가 전망",
+            "topic_3": "기업 실적 개선",
+            "topic_4": "증권사 사업 분석",
+            "topic_5": "대기업 사업 전략",
+            "topic_6": "기업 기술 개발",
+            "topic_7": "반도체 및 AI",
+            "topic_8": "금융 서비스",
+            "topic_9": "주주 및 경영 이슈",
+            "is_same_stock": "관심 유사 종목",
+        }
+
+        top_features_list = []
+        feature_names = df_input.columns.tolist()
+
+        for i, shap_row in enumerate(shap_values):
+            abs_values = [abs(val) for val in shap_row]
+            top_indices = sorted(range(len(abs_values)), key=lambda i: -abs_values[i])[
+                :3
+            ]
+            top_feature_names = [feature_names[i] for i in top_indices]
+
+            main_topic_value = df_input.iloc[i]["main_topic"]
+            converted = []
+
+            for f in top_feature_names:
+                if f == "main_topic" and 1 <= int(main_topic_value) <= 9:
+                    topic_key = f"topic_{int(main_topic_value)}"
+                    converted.append(feature_kor_map.get(topic_key, topic_key))
+                else:
+                    converted.append(feature_kor_map.get(f, f))
+
+            unique_converted = list(
+                dict.fromkeys(converted)
+            )  # ✅ 순서 유지 + 중복 제거
+            top_features_list.append(unique_converted)
+
+        # 7. SHAP 상위 피처 컬럼 추가
+        df_pred["recommend_reasons"] = top_features_list
 
         news_recommend_ranked_list = df_pred[:10].to_dict(orient="records")
 

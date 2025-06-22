@@ -614,7 +614,7 @@ def get_news_recommended(user_id, db):
     end_datetime = datetime.now().replace(
         hour=23, minute=59, second=59, microsecond=999999
     )
-    start_datetime = (end_datetime - timedelta(days=60)).replace(
+    start_datetime = (end_datetime - timedelta(days=90)).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     start_date = start_datetime.strftime("%Y-%m-%d")
@@ -640,8 +640,7 @@ def get_news_recommended(user_id, db):
         # except Exception as e:
         #     print(f"❌ 사용자 {user_id} 정보 조회 실패: {str(e)}")
 
-        # pass
-
+        # 그냥 top_news에서 모델 돌린다
         top_news = get_top_impact_news(
             db=db,
             start_datetime=start_datetime,
@@ -650,7 +649,29 @@ def get_news_recommended(user_id, db):
             stock_list=None,
         )
 
-        return top_news
+        # 추천 뉴스 리랭킹 모델 호출하기
+        API_BASE_URL = "http://15.165.211.100:8000"
+        NEWS_LOGS_ENDPOINT = "/news/recommend/rerank"
+        url = API_BASE_URL + NEWS_LOGS_ENDPOINT
+
+        news_ids = [news["news_id"] for news in top_news]
+        payload = {"user_id": "test", "news_ids": news_ids}
+
+        try:
+            response = requests.post(url, json=payload)
+            response.raise_for_status()
+
+            news_recomended_list = response.json()
+        except Exception as e:
+            print(f"API 호출 실패: {str(e)}")
+            news_recomended_list = []
+
+        print(news_recomended_list)
+
+        if len(news_recomended_list) == 0:
+            return []
+
+        return news_recomended_list
 
     # 2 후보 뉴스 가져오기 (최신 주요 뉴스)
     top_news = get_top_impact_news(
@@ -666,7 +687,7 @@ def get_news_recommended(user_id, db):
     cadidate_news_ids = [news["news_id"] for news in top_news]
 
     API_BASE_URL = "http://15.165.211.100:8000"
-    NEWS_LOGS_ENDPOINT = "/news/recomended"
+    NEWS_LOGS_ENDPOINT = "/news/recommend"
     url = API_BASE_URL + NEWS_LOGS_ENDPOINT
     payload = {
         "news_clicked_ids": clicked_news_ids,
@@ -687,7 +708,7 @@ def get_news_recommended(user_id, db):
 
     # 추천 뉴스 리랭킹 모델 호출하기
     API_BASE_URL = "http://15.165.211.100:8000"
-    NEWS_LOGS_ENDPOINT = "/news/recomended/rerank"
+    NEWS_LOGS_ENDPOINT = "/news/recommend/rerank"
     url = API_BASE_URL + NEWS_LOGS_ENDPOINT
     payload = {"user_id": user_id, "news_ids": news_recomended_candidates_ids}
 

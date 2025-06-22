@@ -120,3 +120,4 @@ class RecommendRankedOut(BaseModel):
     press: str | None  # 언론사 (nullable)
     url: Optional[str]
     click_score: float
+    recommend_reasons: List
