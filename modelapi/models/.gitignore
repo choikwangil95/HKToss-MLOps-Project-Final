@@ -11,3 +11,4 @@ count_vectorizer.pkl
 /two_tower_model.onnx
 /lgbm_model.pkl
 /lgbm_model2.pkl
+/similarity_ranker.onnx

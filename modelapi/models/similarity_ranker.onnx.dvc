@@ -1,0 +1,5 @@
+outs:
+- md5: 01c558121a41568812094d100fb062b1
+  size: 448060
+  hash: md5
+  path: similarity_ranker.onnx

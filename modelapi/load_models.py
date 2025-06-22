@@ -162,7 +162,6 @@ class NewsTossChatbot:
 
         return similar_news
 
-
     def build_prompt(self, context, question, has_news=True):
         if has_news:
             system_prompt = """당신은 과거 뉴스 정보를 바탕으로만 답변하는 전문 AI 챗봇, '뉴스토스'입니다.
@@ -200,9 +199,9 @@ class NewsTossChatbot:
                     {question}"""
 
             return [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                    ]
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
 
         else:
             system_prompt = """당신은 과거 뉴스 기반 AI 챗봇입니다.  
@@ -217,13 +216,12 @@ class NewsTossChatbot:
 
             return [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": user_prompt},
             ]
-
 
     def make_stream_prompt(self, question, top_k=2):
         similar_news = self.search_similar_news(question, top_k=top_k)
-        filtered_news = [row for row in similar_news if row.get('similarity', 0) >= 0.1]
+        filtered_news = [row for row in similar_news if row.get("similarity", 0) >= 0.1]
         retrieved_infos = []
         for row in filtered_news:
             info = (
@@ -275,7 +273,7 @@ def get_similarity_model():
     model_dir = "models/"
     scaler_dir = os.path.join(model_dir, "scalers_grouped")
     ae_path = os.path.join(model_dir, "ae_encoder.onnx")
-    regressor_path = os.path.join(model_dir, "regressor_model.onnx")
+    regressor_path = os.path.join(model_dir, "similarity_ranker.onnx")
 
     # ONNX 모델 로딩
     ae_sess = ort.InferenceSession(ae_path)

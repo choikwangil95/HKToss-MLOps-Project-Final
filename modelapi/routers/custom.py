@@ -128,7 +128,10 @@ async def chat_stream_endpoint(request: Request, payload: ChatIn):
     description="기준 뉴스 ID를 기반으로 회귀 모델이 예측한 유사도 상위 5개 뉴스 결과를 반환합니다.",
 )
 async def get_similarity_scores(
-    request: Request, payload: SimilarityRequest, db: Session = Depends(get_db)
+    request: Request,
+    payload: SimilarityRequest,
+    response=Response,
+    db: Session = Depends(get_db),
 ):
     # 로드된 모델 가져오기
     scalers = request.app.state.scalers
@@ -260,6 +263,11 @@ async def get_similarity_scores(
         news_topk_ids=news_topk_ids,
     )
 
+    if not results:
+        response.headers["X-similarity-mean-score"] = "0"
+        response.headers["X-similarity-variance-score"] = "0"
+        return SimilarityResponse(results=[])
+
     # news_id 매핑
     news_id_map = dict(zip(similar_summaries, news_topk_ids))
     for r in results:
@@ -267,6 +275,13 @@ async def get_similarity_scores(
 
     # 유사도 score 기준 정렬
     results.sort(key=lambda x: x["score"], reverse=True)
+
+    # Prometheus용 헤더 추가
+    similarity_mean = np.mean([result["score"] for result in results])
+    similarity_variance = np.var([result["score"] for result in results])
+
+    response.headers["X-similarity-mean-score"] = f"{similarity_mean:.3f}"
+    response.headers["X-similarity-variance-score"] = f"{similarity_variance:.6f}"
 
     return SimilarityResponse(results=[SimilarityResult(**r) for r in results])
 

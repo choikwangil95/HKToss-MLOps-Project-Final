@@ -112,3 +112,45 @@ instrumentator.add(
         metric_namespace=NAMESPACE, metric_subsystem=SUBSYSTEM, buckets=buckets
     )
 )
+
+# ✅ 전역 평균/분산 Gauge 정의
+SIMILARITY_MEAN = Gauge(
+    name="latest_news_similarity_score",
+    documentation="Latest mean similarity score from /news/similarity",
+    namespace="fastapi_model",
+    subsystem="news",
+)
+
+SIMILARITY_VARIANCE = Gauge(
+    name="latest_news_similarity_variance",
+    documentation="Latest similarity score variance from /news/similarity",
+    namespace="fastapi_model",
+    subsystem="news",
+)
+
+
+# ✅ 인스트루먼테이션 함수
+def similarity_model_output() -> Callable[[Info], None]:
+    def instrumentation(info: Info) -> None:
+        if info.modified_handler.startswith("/news/similarity"):
+            similarity_mean = info.response.headers.get("X-similarity-mean-score")
+            similarity_variance = info.response.headers.get(
+                "X-similarity-variance-score"
+            )
+
+            if similarity_mean:
+                try:
+                    SIMILARITY_MEAN.set(float(similarity_mean))
+                except ValueError:
+                    pass
+
+            if similarity_variance:
+                try:
+                    SIMILARITY_VARIANCE.set(float(similarity_variance))
+                except ValueError:
+                    pass
+
+    return instrumentation
+
+
+instrumentator.add(similarity_model_output())
