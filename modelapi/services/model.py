@@ -812,13 +812,11 @@ async def get_news_recommended_ranked(payload, request, db):
         explainer = shap.TreeExplainer(model_recommend_ranker)
         shap_values = explainer.shap_values(df_input)  # shape: [n_samples, n_features]
 
-        print(shap_values)
-
         # 6. 상위 3개 중요 피처명 추출
         feature_kor_map = {
-            "userPnl": "투자 수익률",
-            "asset": "자산 보유량",
-            "investScore": "투자 성향",
+            "userPnl": "투자 수익률 고려",
+            "asset": "자산 보유량 고려",
+            "investScore": "투자 성향 고려",
             "topic_1": "글로벌 시장 동향",
             "topic_2": "증권사 주가 전망",
             "topic_3": "기업 실적 개선",
