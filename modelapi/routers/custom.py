@@ -277,8 +277,8 @@ async def get_similarity_scores(
     results.sort(key=lambda x: x["score"], reverse=True)
 
     # Prometheus용 헤더 추가
-    similarity_mean = np.mean([result["score"] for result in results])
-    similarity_variance = np.var([result["score"] for result in results])
+    similarity_mean = np.mean([result["score"] for result in results[:5]])
+    similarity_variance = np.var([result["score"] for result in results[:5]])
 
     response.headers["X-similarity-mean-score"] = f"{similarity_mean:.3f}"
     response.headers["X-similarity-variance-score"] = f"{similarity_variance:.6f}"
