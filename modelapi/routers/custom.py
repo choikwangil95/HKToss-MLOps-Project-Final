@@ -311,7 +311,16 @@ async def get_news_recommend(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    return await get_news_recommended_ranked(payload, request, db)
+    results = await get_news_recommended_ranked(payload, request, db)
+
+    # Prometheus용 헤더 추가
+    click_mean = np.mean([result["click_score"] for result in results[:5]])
+    click_variance = np.var([result["click_score"] for result in results[:5]])
+
+    response.headers["X-click-mean-score"] = f"{click_mean:.3f}"
+    response.headers["X-click-variance-score"] = f"{click_variance:.6f}"
+
+    return results
 
 
 @router.get(

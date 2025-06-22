@@ -154,3 +154,44 @@ def similarity_model_output() -> Callable[[Info], None]:
 
 
 instrumentator.add(similarity_model_output())
+
+
+# ✅ 전역 평균/분산 Gauge 정의
+RECOMMEND_MEAN = Gauge(
+    name="latest_news_recommend_score",
+    documentation="Latest mean recommend score from /news/similarity",
+    namespace="fastapi_model",
+    subsystem="news",
+)
+
+RECOMMEND_VARIANCE = Gauge(
+    name="latest_news_recommend_variance",
+    documentation="Latest recommend score variance from /news/similarity",
+    namespace="fastapi_model",
+    subsystem="news",
+)
+
+
+# ✅ 인스트루먼테이션 함수
+def recommend_model_output() -> Callable[[Info], None]:
+    def instrumentation(info: Info) -> None:
+        if info.modified_handler.startswith("/news/recommend/rerank"):
+            click_mean = info.response.headers.get("X-click-mean-score")
+            click_variance = info.response.headers.get("X-click-variance-score")
+
+            if click_mean:
+                try:
+                    RECOMMEND_MEAN.set(float(click_mean))
+                except ValueError:
+                    pass
+
+            if click_variance:
+                try:
+                    RECOMMEND_VARIANCE.set(float(click_variance))
+                except ValueError:
+                    pass
+
+    return instrumentation
+
+
+instrumentator.add(recommend_model_output())
