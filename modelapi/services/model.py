@@ -627,8 +627,8 @@ async def get_news_recommended(payload, request):
     candi_embeddings_np = np.array(news_candidate_embeddings, dtype=np.float32)
 
     # 입력 데이터 형식 조정
-    num_clicked = len(news_clicked_ids)
-    num_candidates = len(news_candidate_ids)
+    num_clicked = len(news_clicked_embeddings)
+    num_candidates = len(news_candidate_embeddings)
 
     clicked_input = clicked_embeddings_np[:num_clicked].reshape(1, num_clicked, 768)
     candidate_input = candi_embeddings_np[:num_candidates].reshape(

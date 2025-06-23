@@ -726,8 +726,6 @@ def get_news_recommended(user_id, db):
     if len(news_recomended_candidates_ids) == 0:
         return []
 
-    print(news_recomended_list)
-
     # 추천 뉴스 리턴하기
 
     return news_recomended_list
