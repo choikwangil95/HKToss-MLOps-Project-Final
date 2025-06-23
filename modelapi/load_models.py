@@ -212,12 +212,10 @@ class NewsTossChatbot:
                 <img src="https://imgnews.pstatic.net/image/015/2024/11/29/0005063326_001_20241129155613852.jpg?type=w200"
                     alt="뉴스 이미지"
                     style="width: 200px; border-radius: 8px; margin-bottom: 12px;">
-
-                <ul style="margin: 0 0 12px 20px; padding: 0;">
-                    <li><strong>유사도</strong>: 0.58</li>
-                    <li><strong>날짜</strong>: 2024-11-29</li>
-                    <li><strong>요약</strong>: 방시혁 하이브 의장은 2020년 하이브 상장 전 스틱인베스트먼트 등과 주주 간 계약을 맺고...</li>
-                </ul>
+           
+                    <p><strong>유사도</strong>: 0.58</p>
+                    <p><strong>날짜</strong>: 2024-11-29</p>
+                    <p><strong>요약</strong>: 방시혁 하이브 의장은 2020년 하이브 상장 전 스틱인베스트먼트 등과 주주 간 계약을 맺고...</p>
 
                 <p style="margin-top: 12px;">추가적으로 궁금한 점이 있으면 언제든 질문해 주세요 😉</p>
                 </div>
@@ -229,12 +227,10 @@ class NewsTossChatbot:
                 답변 마지막에는 반드시 아래 형식으로 **의문문 형태의 유사 질문** 2~3개를 출력하세요.  
                 **마크다운 대신 아래 HTML 구조만 허용됩니다.**
 
-                <h3>아래와 같은 질문도 함께 참고해보세요</h3>
-                <ul>
-                    <li>하이브 상장 당시 방시혁 의장의 계약 내용은 무엇이었나요?</li>
-                    <li>과거 IPO 주관사 선정 과정에서 어떤 이슈들이 있었나요?</li>
-                    <li>IPO 실패 시 지분 반환 조건이 적용된 사례가 있나요?</li>
-                </ul>
+                <h3>아래와 같은 질문도 함께 참고해보세요</h3><br>
+                    <p>하이브 상장 당시 방시혁 의장의 계약 내용은 무엇이었나요?</p>
+                    <p>과거 IPO 주관사 선정 과정에서 어떤 이슈들이 있었나요?</p>
+                    <p>IPO 실패 시 지분 반환 조건이 적용된 사례가 있나요?</p>
             """
 
             user_prompt = f"""## [제공된 유사 뉴스 카드]
