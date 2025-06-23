@@ -988,6 +988,37 @@ def predict_topic_for_df(df, vectorizer, lda_model, stopwords, n_topics=9):
     return result_df
 
 
+def get_news_counts():
+    conn = None
+    cur = None
+
+    try:
+        DB_URL = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@3.37.207.16:5432/postgres"
+        )
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor()
+
+        cur.execute("SELECT COUNT(*) FROM news_v2")
+        count_all = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM news_v2 WHERE DATE(wdate) = CURRENT_DATE")
+        count_today = cur.fetchone()[0]
+
+        return count_all, count_today
+
+    except Exception as e:
+        print.error(f"❌ 뉴스 조회 중 오류 ({type(e).__name__}): {e}")
+
+        return 0, 0
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+
 def send_to_redis(news_data):
     try:
         r = redis.Redis(
@@ -999,6 +1030,8 @@ def send_to_redis(news_data):
         if not r.ping():
             log.error("Redis 서버에 연결할 수 없습니다.")
             return
+
+        news_count_total, news_count_today = get_news_counts()
 
         # Redis에 저장
         for news in news_data:
@@ -1014,6 +1047,8 @@ def send_to_redis(news_data):
                 "url": news["url"],
                 "image": news["image"],
                 "impact_score": news["impact_score"],
+                "news_count_total": news_count_total,
+                "news_count_today": news_count_today,
             }
             message = json.dumps(data, ensure_ascii=False)
             r.publish(channel, message)
