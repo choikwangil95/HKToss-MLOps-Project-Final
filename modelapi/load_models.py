@@ -230,7 +230,7 @@ class NewsTossChatbot:
                     <li>과거 IPO 주관사 선정 과정에서 어떤 이슈들이 있었나요?</li>
                     <li>IPO 실패 시 지분 반환 조건이 적용된 사례가 있나요?</li>
                 </ul>
-
+                <br>
                 <p style="margin-top: 12px;">추가적으로 궁금한 점이 있으면 언제든 질문해 주세요 😉</p>
                 </div>
             """
