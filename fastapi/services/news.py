@@ -650,7 +650,7 @@ def get_news_recommended(user_id, db):
             print(f"사용자 목록 정보 조회 실패: {str(e)}")
             user_data_all = []
 
-        user_invest_score = user_data.get("invest_score")
+        user_invest_score = user_data.get("investScore", 1)
         if user_invest_score == 0:
             user_invest_score = user_invest_score + 1
 
