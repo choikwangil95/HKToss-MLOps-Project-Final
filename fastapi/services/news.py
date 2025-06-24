@@ -23,6 +23,7 @@ from fastapi import HTTPException
 import requests
 from datetime import datetime, timedelta
 import random
+import time
 
 
 def get_news_list(
@@ -556,10 +557,6 @@ def find_news_similar_v2(
     return output[:top_n]
 
 
-import requests
-import pandas as pd
-
-
 def collect_member_news_data(
     member_id: str, start_date: str, end_date: str
 ) -> (list, pd.DataFrame):  # type: ignore
@@ -612,134 +609,117 @@ def collect_member_news_data(
 
 
 def get_news_recommended(user_id, db):
-    # 1 사용자 클릭 뉴스 로그 가져오기
-    # 파라미터 설정
+    start_all = time.perf_counter()
+
+    # 1. 클릭 로그 조회
+    t0 = time.perf_counter()
+
     end_datetime = datetime.now().replace(
         hour=23, minute=59, second=59, microsecond=999999
     )
-    start_datetime = (end_datetime - timedelta(days=90)).replace(
+    start_datetime = (end_datetime - timedelta(days=14)).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     start_date = start_datetime.strftime("%Y-%m-%d")
     end_date = end_datetime.strftime("%Y-%m-%d")
 
-    # [CASE 1]
-    # user_id 가 입력되지 않은 경우, 주요 뉴스에서 추천해준다.
-
-    # [CASE 2]
-    # 사용자 클릭 로그 있는 경우 유저의 클릭 뉴스 로그를 가져온다
     unique_news_ids, click_log_df = collect_member_news_data(
         user_id, start_date, end_date
     )
 
-    # [CASE 3]
-    # 사용자 클릭 로그 없는 경우 비슷한 유저의 클릭 뉴스 로그를 가져온다
+    print(f"[TIME] 사용자 클릭 로그 수집: {time.perf_counter() - t0:.3f}s")
+
+    # 2. 유사 사용자 대체 로직
     if len(unique_news_ids) == 0:
-        # 사용자 정보 가져오기
-        url = f"http://3.37.207.16:8000/users/{user_id}"
+        t1 = time.perf_counter()
 
         try:
-            response = requests.get(url)
-            response.raise_for_status()
-            user_data = response.json()
-
+            user_data = requests.get(f"http://3.37.207.16:8000/users/{user_id}").json()
         except Exception as e:
             print(f"사용자 {user_id} 정보 조회 실패: {str(e)}")
-
-        user_invest_score = user_data["invest_score"]
-
-        # 사용자 목록 가져오기
-        url = f"http://3.37.207.16:8000/users"
+            user_data = {}
 
         try:
-            response = requests.get(url)
-            response.raise_for_status()
-            user_data_all = response.json()
+            user_data_all = requests.get("http://3.37.207.16:8000/users").json()
         except Exception as e:
             print(f"사용자 목록 정보 조회 실패: {str(e)}")
+            user_data_all = []
 
-        # 유사 유저 찾기
-        if user_invest_score is not None:
-            matched_users = [
-                user
-                for user in user_data_all
-                if user["invest_score"] == user_invest_score
-            ]
+        user_invest_score = user_data.get("invest_score")
+        matched_user = next(
+            (u for u in user_data_all if u["invest_score"] == user_invest_score), None
+        )
 
-            matched_user = matched_users[0]
+        if matched_user:
             user_id = matched_user["user_id"]
+
+            try:
+                user_data_logs = requests.get(
+                    f"http://3.37.207.16:8000/users/{user_id}/logs"
+                ).json()
+
+                unique_news_ids = list({data["news_id"] for data in user_data_logs})
+                unique_news_ids = random.sample(
+                    unique_news_ids, min(20, len(unique_news_ids))
+                )
+            except Exception as e:
+                print(f"유사 사용자 뉴스 로그 조회 실패: {str(e)}")
         else:
             print("유사 user_id를 찾을 수 없습니다.")
 
-        # 유사 사용자 로그 가져오기
-        url = f"http://3.37.207.16:8000/users/{user_id}/logs"
+        print(f"[TIME] 유사 사용자 처리: {time.perf_counter() - t1:.3f}s")
 
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            user_data_logs = response.json()
-
-            # ✅ 응답에서 news_id 추출 및 중복 제거
-            unique_news_ids = list({data["news_id"] for data in user_data_logs})
-
-            # ✅ 무작위 20개 추출 (데이터 수가 20개보다 작으면 전부)
-            unique_news_ids = random.sample(
-                unique_news_ids, min(20, len(unique_news_ids))
-            )
-        except Exception as e:
-            print(f"사용자 뉴스 로그 목록 정보 조회 실패: {str(e)}")
-
-    # 2 후보 뉴스 가져오기 (최신 주요 뉴스)
+    # 3. 주요 뉴스 가져오기
+    t2 = time.perf_counter()
     top_news = get_top_impact_news(
         db=db,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
-        limit=50,
+        limit=20,
         stock_list=None,
     )
+    print(f"[TIME] 주요 뉴스 조회: {time.perf_counter() - t2:.3f}s")
 
-    # 추천 뉴스 후보군 선별 모델 호출하기
+    # 4. 후보 필터링 모델 호출
+    t3 = time.perf_counter()
     clicked_news_ids = unique_news_ids.copy()
     candidate_news_ids = [news["news_id"] for news in top_news]
 
-    API_BASE_URL = "http://15.165.211.100:8000"
-    NEWS_LOGS_ENDPOINT = "/news/recommend"
-    url = API_BASE_URL + NEWS_LOGS_ENDPOINT
-    payload = {
-        "news_clicked_ids": clicked_news_ids,
-        "news_candidate_ids": candidate_news_ids,
-    }
+    print(f"{clicked_news_ids} 클릭 news ids")
+    print(f"{candidate_news_ids} 후보 news ids")
 
     try:
-        response = requests.post(url, json=payload)
+        response = requests.post(
+            "http://15.165.211.100:8000/news/recommend",
+            json={
+                "news_clicked_ids": clicked_news_ids[:10],
+                "news_candidate_ids": candidate_news_ids,
+            },
+        )
         response.raise_for_status()
-
         news_recomended_candidates_ids = response.json()
     except Exception as e:
         print(f"추천 뉴스 후보군 API 호출 실패: {str(e)}")
         news_recomended_candidates_ids = []
 
-    if len(news_recomended_candidates_ids) == 0:
-        return []
+    print(f"[TIME] 추천 후보 필터링 모델 호출: {time.perf_counter() - t3:.3f}s")
 
-    # 추천 뉴스 리랭킹 모델 호출하기
-    API_BASE_URL = "http://15.165.211.100:8000"
-    NEWS_LOGS_ENDPOINT = "/news/recommend/rerank"
-    url = API_BASE_URL + NEWS_LOGS_ENDPOINT
-    payload = {"user_id": user_id, "news_ids": news_recomended_candidates_ids}
-
+    print(f"[DEBUG] 리랭킹 대상 뉴스 수: {len(news_recomended_candidates_ids)}")
+    # 5. 리랭킹 모델 호출
+    t4 = time.perf_counter()
     try:
-        response = requests.post(url, json=payload)
+        response = requests.post(
+            "http://15.165.211.100:8000/news/recommend/rerank",
+            json={"user_id": user_id, "news_ids": news_recomended_candidates_ids},
+        )
         response.raise_for_status()
-
         news_recomended_list = response.json()
     except Exception as e:
         print(f"추천 뉴스 리랭킹 API 호출 실패: {str(e)}")
         news_recomended_list = []
 
-    if len(news_recomended_candidates_ids) == 0:
-        return []
+    print(f"[TIME] 리랭킹 모델 호출: {time.perf_counter() - t4:.3f}s")
 
-    # 추천 뉴스 리턴하기
+    print(f"[TIME] 전체 추천 소요 시간: {time.perf_counter() - start_all:.3f}s")
 
     return news_recomended_list
