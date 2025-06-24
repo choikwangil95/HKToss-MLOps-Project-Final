@@ -625,39 +625,6 @@ def get_news_recommended(user_id, db):
 
     # [CASE 1]
     # user_id 가 입력되지 않은 경우, 주요 뉴스에서 추천해준다.
-    is_user_not_exist = user_id in [None, "", "None"]
-    if is_user_not_exist:
-        # 그냥 top_news에서 모델 돌린다
-        top_news = get_top_impact_news(
-            db=db,
-            start_datetime=start_datetime,
-            end_datetime=end_datetime,
-            limit=100,
-            stock_list=None,
-        )
-
-        # 추천 뉴스 리랭킹 모델 호출하기
-        API_BASE_URL = "http://15.165.211.100:8000"
-        NEWS_LOGS_ENDPOINT = "/news/recommend/rerank"
-        url = API_BASE_URL + NEWS_LOGS_ENDPOINT
-
-        news_ids = [news["news_id"] for news in top_news]
-        payload = {"user_id": "test", "news_ids": news_ids}
-
-        try:
-            response = requests.post(url, json=payload)
-            response.raise_for_status()
-
-            news_recomended_list = response.json()
-            print(news_recomended_list)
-        except Exception as e:
-            print(f"API 호출 실패: {str(e)}")
-            news_recomended_list = []
-
-        if len(news_recomended_list) == 0:
-            return []
-
-        return news_recomended_list
 
     # [CASE 2]
     # 사용자 클릭 로그 있는 경우 유저의 클릭 뉴스 로그를 가져온다
@@ -716,7 +683,7 @@ def get_news_recommended(user_id, db):
             unique_news_ids = list({data["news_id"] for data in user_data_logs})
 
             # ✅ 무작위 20개 추출 (데이터 수가 20개보다 작으면 전부)
-            sampled_news_ids = random.sample(
+            unique_news_ids = random.sample(
                 unique_news_ids, min(20, len(unique_news_ids))
             )
         except Exception as e:

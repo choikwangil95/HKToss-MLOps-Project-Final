@@ -252,7 +252,7 @@ async def get_top_impact_news_api(
     description="뉴스 맞춤 추천",
 )
 async def get_news_summary_router(
-    user_id: Optional[str] = Query(None, description="유저 고유 ID (선택)"),
+    user_id: str = Query(description="유저 고유 ID (선택)"),
     db: Session = Depends(get_db),
 ):
     """

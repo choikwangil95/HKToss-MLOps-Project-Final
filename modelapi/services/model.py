@@ -672,38 +672,42 @@ async def get_news_recommended_ranked(payload, request, db):
     # 기본값
     user_data = {"userPnl": 0, "asset": 0, "investScore": 1}
 
-    # 1차 API 요청 (3.39.99.26)
-    try:
-        url1 = f"http://3.39.99.26:8080/api/v1/userinfo/{user_id}"
-        response = requests.get(url1, timeout=1)
-        response.raise_for_status()
-        data = response.json()["data"]
-
-        if isinstance(data, dict) and data:
-            data = data
-        else:
-            raise ValueError(f"✅ 사용자 {user_id} 정보 조회 실패 (1차): {url1}")
-    except Exception as e:
-        print(f"❌ 1차 사용자 API 실패: {str(e)}")
-
-        # 2차 API 요청 (3.37.207.16)
+    is_user_exist = user_id not in [None, "", "None"]
+    if is_user_exist:
+        # 1차 API 요청 (3.39.99.26)
         try:
-            url2 = f"http://3.37.207.16:8000/users/{user_id}"
-            response = requests.get(url2, timeout=1)
+            url1 = f"http://3.39.99.26:8080/api/v1/userinfo/{user_id}"
+            response = requests.get(url1, timeout=1)
             response.raise_for_status()
-            data = response.json()
+            data = response.json()["data"]
 
-            print(f"✅ 사용자 {user_id} 정보 조회 성공 (2차): {url2}")
+            if isinstance(data, dict) and data:
+                user_data = data
+            else:
+                raise ValueError(f"✅ 사용자 {user_id} 정보 조회 실패 (1차): {url1}")
         except Exception as e:
-            print(f"❌ 2차 사용자 API 실패: {str(e)}")
-            print(f"⚠️ 기본 사용자 데이터로 대체: {data}")
+            print(f"❌ 1차 사용자 API 실패: {str(e)}")
 
-    user_data = {
-        "userPnl": data.get("userPnl") or data.get("user_pnl", 0),
-        "asset": data.get("asset", 0),
-        "investScore": data.get("investScore") or data.get("invest_score", 0),
-        "memberStocks": data.get("memberStocks") or data.get("member_stocks", []),
-    }
+            # 2차 API 요청 (3.37.207.16)
+            try:
+                url2 = f"http://3.37.207.16:8000/users/{user_id}"
+                response = requests.get(url2, timeout=1)
+                response.raise_for_status()
+                user_data = response.json()
+
+                print(f"✅ 사용자 {user_id} 정보 조회 성공 (2차): {url2}")
+            except Exception as e:
+                print(f"❌ 2차 사용자 API 실패: {str(e)}")
+                print(f"⚠️ 기본 사용자 데이터로 대체: {user_data}")
+
+        user_data = {
+            "userPnl": user_data.get("userPnl") or user_data.get("user_pnl", 0),
+            "asset": user_data.get("asset", 0),
+            "investScore": user_data.get("investScore")
+            or user_data.get("invest_score", 1),
+            "memberStocks": user_data.get("memberStocks")
+            or user_data.get("member_stocks", []),
+        }
 
     # 뉴스 정보 가져오기
     news_ids = payload.news_ids
