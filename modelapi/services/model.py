@@ -289,7 +289,7 @@ def get_lda_topic(text, request):
 
 # ✅ 전역 Redis 연결 재사용
 redis_conn = redis.Redis(
-    host="43.200.17.139",
+    host="3.39.99.26",
     port=6379,
     password="q1w2e3r4!@#",
     decode_responses=True,
@@ -672,9 +672,9 @@ async def get_news_recommended_ranked(payload, request, db):
     # 기본값
     user_data = {"userPnl": 0, "asset": 0, "investScore": 0}
 
-    # 1차 API 요청 (43.200.17.139)
+    # 1차 API 요청 (3.39.99.26)
     try:
-        url1 = f"http://43.200.17.139:8080/api/v1/userinfo/{user_id}"
+        url1 = f"http://3.39.99.26:8080/api/v1/userinfo/{user_id}"
         response = requests.get(url1, timeout=1)
         response.raise_for_status()
         user_data = response.json()["data"]

@@ -1022,7 +1022,7 @@ def get_news_counts():
 def send_to_redis(news_data):
     try:
         r = redis.Redis(
-            host="43.200.17.139",
+            host="3.39.99.26",
             port=6379,
             password="q1w2e3r4!@#",
             decode_responses=True,  # bytes 대신 str 로 받기

@@ -571,7 +571,7 @@ def collect_member_news_data(
         - unique_news_ids: 중복 제거된 newsId 목록
         - click_log_df: 원본 로그 데이터 DataFrame (news_id 컬럼 포함)
     """
-    API_BASE_URL = "http://43.200.17.139:8080"
+    API_BASE_URL = "http://3.39.99.26:8080"
     NEWS_LOGS_ENDPOINT = "/api/newsLogs"
     url = API_BASE_URL + NEWS_LOGS_ENDPOINT
     params = {"startDate": start_date, "endDate": end_date, "memberId": member_id}
