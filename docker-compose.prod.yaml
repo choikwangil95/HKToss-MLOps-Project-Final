@@ -10,6 +10,7 @@ services:
       - db
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/postgres
+      - ENABLE_METRICS=true
     # volumes:
     #   - ./fastapi:/fastapi
     command: gunicorn main:app -k uvicorn.workers.UvicornWorker --workers 8 --bind 0.0.0.0:8000
@@ -42,6 +43,22 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db:/docker-entrypoint-initdb.d
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    command:
+      - '--web.listen-address=0.0.0.0:9090'
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus/prometheus-rdb.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
 
 # airflow-webserver:
 #   image: apache/airflow:2.7.2
