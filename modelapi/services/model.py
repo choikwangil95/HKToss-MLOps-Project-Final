@@ -670,7 +670,7 @@ async def get_news_recommended_ranked(payload, request, db):
     user_id = payload.user_id
 
     # 기본값
-    user_data = {"userPnl": 0, "asset": 0, "investScore": 0}
+    user_data = {"userPnl": 0, "asset": 0, "investScore": 1}
 
     # 1차 API 요청 (3.39.99.26)
     try:
@@ -681,8 +681,8 @@ async def get_news_recommended_ranked(payload, request, db):
 
         if isinstance(data, dict) and data:
             user_data = data
-
-        print(f"✅ 사용자 {user_id} 정보 조회 성공 (1차): {url1}")
+        else:
+            raise ValueError(f"✅ 사용자 {user_id} 정보 조회 성공 (1차): {url1}")
     except Exception as e:
         print(f"❌ 1차 사용자 API 실패: {str(e)}")
 

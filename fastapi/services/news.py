@@ -22,6 +22,7 @@ import ast
 from fastapi import HTTPException
 import requests
 from datetime import datetime, timedelta
+import random
 
 
 def get_news_list(
@@ -711,7 +712,13 @@ def get_news_recommended(user_id, db):
             response.raise_for_status()
             user_data_logs = response.json()
 
-            unique_news_ids = [data["news_id"] for data in user_data_logs]
+            # ✅ 응답에서 news_id 추출 및 중복 제거
+            unique_news_ids = list({data["news_id"] for data in user_data_logs})
+
+            # ✅ 무작위 20개 추출 (데이터 수가 20개보다 작으면 전부)
+            sampled_news_ids = random.sample(
+                unique_news_ids, min(20, len(unique_news_ids))
+            )
         except Exception as e:
             print(f"사용자 뉴스 로그 목록 정보 조회 실패: {str(e)}")
 
@@ -720,7 +727,7 @@ def get_news_recommended(user_id, db):
         db=db,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
-        limit=100,
+        limit=50,
         stock_list=None,
     )
 
