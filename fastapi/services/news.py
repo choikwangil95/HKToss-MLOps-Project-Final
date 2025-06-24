@@ -633,8 +633,13 @@ def get_news_recommended(user_id, db):
     if len(unique_news_ids) == 0:
         t1 = time.perf_counter()
 
+        # 현재 사용자
         try:
-            user_data = requests.get(f"http://3.37.207.16:8000/users/{user_id}").json()
+            response = requests.get(
+                f"http://3.39.99.26:8080/api/v1/userinfo/{user_id}", timeout=1
+            )
+            response.raise_for_status()
+            user_data = response.json()["data"]
         except Exception as e:
             print(f"사용자 {user_id} 정보 조회 실패: {str(e)}")
             user_data = {}
@@ -646,6 +651,9 @@ def get_news_recommended(user_id, db):
             user_data_all = []
 
         user_invest_score = user_data.get("invest_score")
+        if user_invest_score == 0:
+            user_invest_score = user_invest_score + 1
+
         matched_user = next(
             (u for u in user_data_all if u["invest_score"] == user_invest_score), None
         )
