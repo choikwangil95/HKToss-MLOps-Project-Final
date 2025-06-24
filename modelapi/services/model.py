@@ -675,7 +675,7 @@ async def get_news_recommended_ranked(payload, request, db):
     # 1차 API 요청 (43.200.17.139)
     try:
         url1 = f"http://43.200.17.139:8080/api/v1/userinfo/{user_id}"
-        response = requests.get(url1, timeout=3)
+        response = requests.get(url1, timeout=1)
         response.raise_for_status()
         user_data = response.json()["data"]
 
@@ -686,7 +686,7 @@ async def get_news_recommended_ranked(payload, request, db):
         # 2차 API 요청 (3.37.207.16)
         try:
             url2 = f"http://3.37.207.16:8000/users/{user_id}"
-            response = requests.get(url2, timeout=3)
+            response = requests.get(url2, timeout=1)
             response.raise_for_status()
             user_data = response.json()
 

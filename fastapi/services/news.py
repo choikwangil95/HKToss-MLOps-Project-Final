@@ -577,7 +577,7 @@ def collect_member_news_data(
     params = {"startDate": start_date, "endDate": end_date, "memberId": member_id}
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=1)
         response.raise_for_status()
         api_response = response.json()
     except Exception as e:
