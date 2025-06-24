@@ -680,9 +680,9 @@ async def get_news_recommended_ranked(payload, request, db):
         data = response.json()["data"]
 
         if isinstance(data, dict) and data:
-            user_data = data
+            data = data
         else:
-            raise ValueError(f"✅ 사용자 {user_id} 정보 조회 성공 (1차): {url1}")
+            raise ValueError(f"✅ 사용자 {user_id} 정보 조회 실패 (1차): {url1}")
     except Exception as e:
         print(f"❌ 1차 사용자 API 실패: {str(e)}")
 
@@ -691,12 +691,19 @@ async def get_news_recommended_ranked(payload, request, db):
             url2 = f"http://3.37.207.16:8000/users/{user_id}"
             response = requests.get(url2, timeout=1)
             response.raise_for_status()
-            user_data = response.json()
+            data = response.json()
 
             print(f"✅ 사용자 {user_id} 정보 조회 성공 (2차): {url2}")
         except Exception as e:
             print(f"❌ 2차 사용자 API 실패: {str(e)}")
-            print(f"⚠️ 기본 사용자 데이터로 대체: {user_data}")
+            print(f"⚠️ 기본 사용자 데이터로 대체: {data}")
+
+    user_data = {
+        "userPnl": data.get("userPnl") or data.get("user_pnl", 0),
+        "asset": data.get("asset", 0),
+        "investScore": data.get("investScore") or data.get("invest_score", 0),
+        "memberStocks": data.get("memberStocks") or data.get("member_stocks", []),
+    }
 
     # 뉴스 정보 가져오기
     news_ids = payload.news_ids
