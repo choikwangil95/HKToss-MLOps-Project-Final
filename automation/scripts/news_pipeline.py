@@ -1038,11 +1038,19 @@ def send_to_redis(news_data):
             channel = "news-channel"
 
             wdate = datetime.strptime(news["wdate"], "%Y-%m-%d %H:%M").isoformat()
+            stock_list = (
+                ast.literal_eval(news["stock_list"])
+                if isinstance(news["stock_list"], str)
+                else news["stock_list"]
+            )
+
             data = {
                 "news_id": news["news_id"],
                 "wdate": wdate,
                 "title": news["title"],
                 "article": news["article"],
+                "summary": news["summary"],
+                "stock": stock_list[-1] if stock_list else None,
                 "press": news["press"],
                 "url": news["url"],
                 "image": news["image"],
