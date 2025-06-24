@@ -180,7 +180,7 @@ class NewsTossChatbot:
 
                 ### 2. 시사 이슈/사건 질문(경제·산업·주식·정책 등)
                 - 반드시 아래 형식으로 뉴스 카드 HTML을 그대로 출력하세요.
-
+                - 가급적 2개의 뉴스 카드를 보여주세요.
 
                 [뉴스 카드 출력 형식]
 
@@ -191,7 +191,7 @@ class NewsTossChatbot:
                 <div style="margin-bottom: 24px;">
                 <h3 style="margin: 0 0 8px 0;">
                     <a href="https://n.news.naver.com/mnews/article/015/0005063326" target="_blank" style="text-decoration: none; color: #0070f3;">
-                    하이브 상장 때 4000억 따로 챙긴 방시혁…당국, 제재 여부 검토
+                    <strong>하이브 상장 때 4000억 따로 챙긴 방시혁…당국, 제재 여부 검토</strong>
                     </a>
                 </h3>
 
@@ -213,9 +213,9 @@ class NewsTossChatbot:
                 <br />
                 <h3 style="margin-top: 10px ;">아래와 같은 질문도 함께 참고해보세요!</h3>
                 <br />
-                    <p>하이브 상장 당시 방시혁 의장의 계약 내용은 무엇이었나요?</p>
-                    <p>과거 IPO 주관사 선정 과정에서 어떤 이슈들이 있었나요?</p>
-                    <p>IPO 실패 시 지분 반환 조건이 적용된 사례가 있나요?</p>
+                    <p>▸ 하이브 상장 당시 방시혁 의장의 계약 내용은 무엇이었나요?</p>
+                    <p>▸ 과거 IPO 주관사 선정 과정에서 어떤 이슈들이 있었나요?</p>
+                    <p>▸ IPO 실패 시 지분 반환 조건이 적용된 사례가 있나요?</p>
                 </ul>
                 <br />
                 <p style="margin-top: 12px;">추가적으로 궁금한 점이 있으면 언제든 질문해 주세요 😉</p>
