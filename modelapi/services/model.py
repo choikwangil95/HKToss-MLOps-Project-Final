@@ -677,7 +677,10 @@ async def get_news_recommended_ranked(payload, request, db):
         url1 = f"http://3.39.99.26:8080/api/v1/userinfo/{user_id}"
         response = requests.get(url1, timeout=1)
         response.raise_for_status()
-        user_data = response.json()["data"]
+        data = response.json()["data"]
+
+        if isinstance(data, dict) and data:
+            user_data = data
 
         print(f"✅ 사용자 {user_id} 정보 조회 성공 (1차): {url1}")
     except Exception as e:

@@ -668,7 +668,7 @@ def get_news_recommended(user_id, db):
     # 사용자 클릭 로그 없는 경우 비슷한 유저의 클릭 뉴스 로그를 가져온다
     if len(unique_news_ids) == 0:
         # 사용자 정보 가져오기
-        url = f"http://localhost:8000/users/{user_id}"
+        url = f"http://3.37.207.16:8000/users/{user_id}"
 
         try:
             response = requests.get(url)
@@ -681,7 +681,7 @@ def get_news_recommended(user_id, db):
         user_invest_score = user_data["invest_score"]
 
         # 사용자 목록 가져오기
-        url = f"http://localhost:8000/users"
+        url = f"http://3.37.207.16:8000/users"
 
         try:
             response = requests.get(url)
@@ -703,9 +703,17 @@ def get_news_recommended(user_id, db):
         else:
             print("유사 user_id를 찾을 수 없습니다.")
 
-    unique_news_ids, click_log_df = collect_member_news_data(
-        user_id, start_date, end_date
-    )
+        # 유사 사용자 로그 가져오기
+        url = f"http://3.37.207.16:8000/users/{user_id}/logs"
+
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            user_data_logs = response.json()
+
+            unique_news_ids = [data["news_id"] for data in user_data_logs]
+        except Exception as e:
+            print(f"사용자 뉴스 로그 목록 정보 조회 실패: {str(e)}")
 
     # 2 후보 뉴스 가져오기 (최신 주요 뉴스)
     top_news = get_top_impact_news(
@@ -734,7 +742,7 @@ def get_news_recommended(user_id, db):
 
         news_recomended_candidates_ids = response.json()
     except Exception as e:
-        print(f"API 호출 실패: {str(e)}")
+        print(f"추천 뉴스 후보군 API 호출 실패: {str(e)}")
         news_recomended_candidates_ids = []
 
     if len(news_recomended_candidates_ids) == 0:
@@ -752,7 +760,7 @@ def get_news_recommended(user_id, db):
 
         news_recomended_list = response.json()
     except Exception as e:
-        print(f"API 호출 실패: {str(e)}")
+        print(f"추천 뉴스 리랭킹 API 호출 실패: {str(e)}")
         news_recomended_list = []
 
     if len(news_recomended_candidates_ids) == 0:
