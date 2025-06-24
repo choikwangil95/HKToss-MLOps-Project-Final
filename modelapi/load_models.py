@@ -189,7 +189,7 @@ class NewsTossChatbot:
                 - HTML 출력 예시:
 
                 <div style="margin-bottom: 24px;">
-                <h3 style="margin: 0 0 8px 0;">
+                <h3 style="margin: 0 0 8px 0; font-size: 22px;">
                     <a href="https://n.news.naver.com/mnews/article/015/0005063326" target="_blank" style="text-decoration: none; color: #0070f3;">
                     <strong>하이브 상장 때 4000억 따로 챙긴 방시혁…당국, 제재 여부 검토</strong>
                     </a>
@@ -211,7 +211,7 @@ class NewsTossChatbot:
                 - **마크다운 대신 아래 HTML 구조만 허용됩니다.**
 
                 <br />
-                <h3 style="margin-top: 10px ;">아래와 같은 질문도 함께 참고해보세요!</h3>
+                <h3 style="margin-top: 10px; font-size: 21px;">아래와 같은 질문도 함께 참고해보세요!</h3>
                 <br />
                     <p>▸ 하이브 상장 당시 방시혁 의장의 계약 내용은 무엇이었나요?</p>
                     <p>▸ 과거 IPO 주관사 선정 과정에서 어떤 이슈들이 있었나요?</p>
