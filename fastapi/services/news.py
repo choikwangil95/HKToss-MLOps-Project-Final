@@ -613,7 +613,6 @@ def collect_member_news_data(
 def get_news_recommended(user_id, db):
     # 1 사용자 클릭 뉴스 로그 가져오기
     # 파라미터 설정
-    user_id  # 또는 실제 멤버 ID
     end_datetime = datetime.now().replace(
         hour=23, minute=59, second=59, microsecond=999999
     )
@@ -623,27 +622,10 @@ def get_news_recommended(user_id, db):
     start_date = start_datetime.strftime("%Y-%m-%d")
     end_date = end_datetime.strftime("%Y-%m-%d")
 
-    # 뉴스 ID 수집
-    unique_news_ids, click_log_df = collect_member_news_data(
-        user_id, start_date, end_date
-    )
-
-    # 사용자 클릭 로그 없는 경우 비슷한 유저의 클릭 뉴스 로그를 가져온다
-    is_user_not_exist = user_id == "" or user_id == None
-    if len(unique_news_ids) == 0 or is_user_not_exist:
-        # 사용자 정보 가져오기
-
-        # url = f"http://43.200.17.139:8080/api/v1/userinfo/{user_id}"
-
-        # try:
-        #     response = requests.get(url)
-        #     response.raise_for_status()
-        #     user_data = response.json()["data"]
-
-        #     print(f"✅ 사용자 {user_id} 정보 조회 성공")
-        # except Exception as e:
-        #     print(f"❌ 사용자 {user_id} 정보 조회 실패: {str(e)}")
-
+    # [CASE 1]
+    # user_id 가 입력되지 않은 경우, 주요 뉴스에서 추천해준다.
+    is_user_not_exist = user_id in [None, "", "None"]
+    if is_user_not_exist:
         # 그냥 top_news에서 모델 돌린다
         top_news = get_top_impact_news(
             db=db,
@@ -666,6 +648,7 @@ def get_news_recommended(user_id, db):
             response.raise_for_status()
 
             news_recomended_list = response.json()
+            print(news_recomended_list)
         except Exception as e:
             print(f"API 호출 실패: {str(e)}")
             news_recomended_list = []
@@ -674,6 +657,55 @@ def get_news_recommended(user_id, db):
             return []
 
         return news_recomended_list
+
+    # [CASE 2]
+    # 사용자 클릭 로그 있는 경우 유저의 클릭 뉴스 로그를 가져온다
+    unique_news_ids, click_log_df = collect_member_news_data(
+        user_id, start_date, end_date
+    )
+
+    # [CASE 3]
+    # 사용자 클릭 로그 없는 경우 비슷한 유저의 클릭 뉴스 로그를 가져온다
+    if len(unique_news_ids) == 0:
+        # 사용자 정보 가져오기
+        url = f"http://localhost:8000/users/{user_id}"
+
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            user_data = response.json()
+
+        except Exception as e:
+            print(f"사용자 {user_id} 정보 조회 실패: {str(e)}")
+
+        user_invest_score = user_data["invest_score"]
+
+        # 사용자 목록 가져오기
+        url = f"http://localhost:8000/users"
+
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            user_data_all = response.json()
+        except Exception as e:
+            print(f"사용자 목록 정보 조회 실패: {str(e)}")
+
+        # 유사 유저 찾기
+        if user_invest_score is not None:
+            matched_users = [
+                user
+                for user in user_data_all
+                if user["invest_score"] == user_invest_score
+            ]
+
+            matched_user = matched_users[0]
+            user_id = matched_user["user_id"]
+        else:
+            print("유사 user_id를 찾을 수 없습니다.")
+
+    unique_news_ids, click_log_df = collect_member_news_data(
+        user_id, start_date, end_date
+    )
 
     # 2 후보 뉴스 가져오기 (최신 주요 뉴스)
     top_news = get_top_impact_news(
@@ -686,14 +718,14 @@ def get_news_recommended(user_id, db):
 
     # 추천 뉴스 후보군 선별 모델 호출하기
     clicked_news_ids = unique_news_ids.copy()
-    cadidate_news_ids = [news["news_id"] for news in top_news]
+    candidate_news_ids = [news["news_id"] for news in top_news]
 
     API_BASE_URL = "http://15.165.211.100:8000"
     NEWS_LOGS_ENDPOINT = "/news/recommend"
     url = API_BASE_URL + NEWS_LOGS_ENDPOINT
     payload = {
         "news_clicked_ids": clicked_news_ids,
-        "news_candidate_ids": cadidate_news_ids,
+        "news_candidate_ids": candidate_news_ids,
     }
 
     try:

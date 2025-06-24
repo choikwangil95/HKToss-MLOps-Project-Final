@@ -666,23 +666,34 @@ async def get_news_recommended_ranked(payload, request, db):
     """
     뉴스 후보군 추천
     """
-    # 모델 가져오기
     model_recommend_ranker = request.app.state.model_recommend_ranker
-
-    # 사용자 정보 가져오기
     user_id = payload.user_id
 
-    url = f"http://43.200.17.139:8080/api/v1/userinfo/{user_id}"
+    # 기본값
+    user_data = {"userPnl": 0, "asset": 0, "investScore": 0}
 
+    # 1차 API 요청 (43.200.17.139)
     try:
-        response = requests.get(url)
+        url1 = f"http://43.200.17.139:8080/api/v1/userinfo/{user_id}"
+        response = requests.get(url1, timeout=3)
         response.raise_for_status()
         user_data = response.json()["data"]
 
-        print(f"✅ 사용자 {user_id} 정보 조회 성공")
+        print(f"✅ 사용자 {user_id} 정보 조회 성공 (1차): {url1}")
     except Exception as e:
-        print(f"❌ 사용자 {user_id} 정보 조회 실패: {str(e)}")
-        user_data = {"userPnl": 0, "asset": 0, "investScore": 0}
+        print(f"❌ 1차 사용자 API 실패: {str(e)}")
+
+        # 2차 API 요청 (3.37.207.16)
+        try:
+            url2 = f"http://3.37.207.16:8000/users/{user_id}"
+            response = requests.get(url2, timeout=3)
+            response.raise_for_status()
+            user_data = response.json()
+
+            print(f"✅ 사용자 {user_id} 정보 조회 성공 (2차): {url2}")
+        except Exception as e:
+            print(f"❌ 2차 사용자 API 실패: {str(e)}")
+            print(f"⚠️ 기본 사용자 데이터로 대체: {user_data}")
 
     # 뉴스 정보 가져오기
     news_ids = payload.news_ids

@@ -236,3 +236,41 @@ BEGIN
         WITH (FORMAT csv, HEADER true);
     END IF;
 END $$;
+
+
+-- news_v2_log 테이블 생성
+CREATE TABLE news_v2_log (
+  id INT,
+  user_id TEXT,
+  news_id TEXT,
+  wdate TIMESTAMP
+);
+
+-- 테이블에 데이터가 없을 때만 CSV에서 데이터 COPY 수행
+DO $$
+BEGIN
+    IF (SELECT COUNT(*) FROM news_v2_log) = 0 THEN
+        COPY news_v2_log(id, user_id, news_id, wdate)
+        FROM '/docker-entrypoint-initdb.d/news_2023_2025_log.csv'
+        WITH (FORMAT csv, HEADER true);
+    END IF;
+END $$;
+
+
+-- user_profile 테이블 생성 
+CREATE TABLE user_profile (
+  user_id VARCHAR PRIMARY KEY,
+  userPnl INT,
+  asset	INT,
+  investScore INT,
+  memberStocks JSON
+);
+
+DO $$
+BEGIN
+    IF (SELECT COUNT(*) FROM user_profile) = 0 THEN
+        COPY user_profile(user_id, userPnl, asset, investScore, memberStocks)
+        FROM '/docker-entrypoint-initdb.d/user_profile.csv'
+        WITH (FORMAT csv, HEADER true);
+    END IF;
+END $$;
