@@ -675,7 +675,7 @@ def get_news_recommended(user_id, db):
         db=db,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
-        limit=40,
+        limit=30,
         stock_list=None,
     )
     print(f"[TIME] 주요 뉴스 조회: {time.perf_counter() - t2:.3f}s")
