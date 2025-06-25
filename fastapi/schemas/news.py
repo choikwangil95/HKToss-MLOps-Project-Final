@@ -83,6 +83,19 @@ class NewsOut_v2(BaseModel):
         from_attributes = True
 
 
+class NewsOut_v2_detail(BaseModel):
+    news_id: str
+    wdate: Optional[datetime]
+    title: str
+    article: str
+    url: Optional[str]
+    press: str
+    image: str
+
+    class Config:
+        from_attributes = True
+
+
 class NewsOut_v2_Metadata(BaseModel):
     news_id: str
     summary: str

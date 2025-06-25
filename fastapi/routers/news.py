@@ -9,6 +9,7 @@ from schemas.news import (
     NewsOut_v2,
     NewsOut_v2_External,
     NewsOut_v2_Metadata,
+    NewsOut_v2_detail,
     RecommendNewsResponse,
     RecommendedNewsV2,
     SimilarNews,
@@ -263,7 +264,7 @@ async def get_news_summary_router(
 
 @router_v2.get(
     "/{news_id}",
-    response_model=NewsOut_v2,
+    response_model=NewsOut_v2_detail,
     summary="[완료] 뉴스 상세 조회",
     description="뉴스 ID를 기반으로 해당 뉴스 기사의 상세 정보를 조회합니다.",
 )
