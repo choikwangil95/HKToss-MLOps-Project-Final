@@ -121,3 +121,4 @@ class RecommendRankedOut(BaseModel):
     url: Optional[str]
     click_score: float
     recommend_reasons: List
+    stock_list: Optional[List[Dict[str, str]]] = []
