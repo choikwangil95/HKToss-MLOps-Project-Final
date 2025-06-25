@@ -512,12 +512,13 @@ def update_db_impact_score(score_datas):
 
     update_query = """
         UPDATE news_v2_metadata
-        SET impact_score = %s
+        SET impact_score = %s, scaled_impact_score = %s
         WHERE news_id = %s;
     """
 
     values = [
         (
+            data["score"],
             data["score"],
             data["news_id"],
         )
@@ -1413,6 +1414,18 @@ def request_impact_score(news_id):
 
 def get_impact_score(market_datas):
     return [request_impact_score(md["news_id"]) for md in market_datas]
+
+
+def scale_impact_score(value, threshold=0.3):
+    if value is None:
+        return 0
+    try:
+        if value <= threshold:
+            return round((value / threshold) * 100, 2)
+        else:
+            return 100.0
+    except:
+        return 0
 
 
 if __name__ == "__main__":
