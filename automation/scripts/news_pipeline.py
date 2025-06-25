@@ -512,13 +512,12 @@ def update_db_impact_score(score_datas):
 
     update_query = """
         UPDATE news_v2_metadata
-        SET impact_score = %s, scaled_impact_score = %s
+        SET impact_score = %s
         WHERE news_id = %s;
     """
 
     values = [
         (
-            data["score"],
             data["score"],
             data["news_id"],
         )
