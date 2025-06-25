@@ -57,7 +57,9 @@ def get_news_list_v2(
     start_datetime: Optional[datetime] = None,
     end_datetime: Optional[datetime] = None,
 ):
-    query = db.query(NewsModel_v2)
+    query = db.query(NewsModel_v2, NewsModel_v2_Metadata.stock_list).join(
+        NewsModel_v2_Metadata, NewsModel_v2.news_id == NewsModel_v2_Metadata.news_id
+    )
 
     if title:
         query = query.filter(NewsModel_v2.title.ilike(f"%{title}%"))
@@ -81,7 +83,15 @@ def get_news_list_v2(
             )
             query = query.filter(NewsModel_v2.news_id.in_(subquery))
 
-    return query.order_by(desc(NewsModel_v2.wdate)).offset(skip).limit(limit).all()
+    results = query.order_by(desc(NewsModel_v2.wdate)).offset(skip).limit(limit).all()
+
+    response = []
+    for news_obj, stock_list_value in results:
+        news_dict = {**news_obj.__dict__, "stock_list": stock_list_value}
+        news_dict.pop("_sa_instance_state", None)
+        response.append(news_dict)
+
+    return response
 
 
 def get_news_detail(db: Session, news_id: str):
@@ -335,6 +345,7 @@ def get_top_impact_news(
             NewsModel_v2.url,
             NewsModel_v2_Metadata.summary,
             NewsModel_v2_Metadata.impact_score,
+            NewsModel_v2_Metadata.stock_list,
         )
         .join(
             NewsModel_v2_Metadata, NewsModel_v2.news_id == NewsModel_v2_Metadata.news_id
@@ -377,6 +388,7 @@ def get_top_impact_news(
             "summary": row.summary,
             "impact_score": row.impact_score,
             "url": row.url,
+            "stock_list": row.stock_list,  # ✅ 포함
         }
         for row in results
     ]
@@ -394,6 +406,13 @@ def find_news_similar_v3(
     )
 
     def convert(row):
+        # ✅ 메타데이터에서 stock_list 추가 조회
+        stock_list = (
+            db.query(NewsModel_v2_Metadata.stock_list)
+            .filter(NewsModel_v2_Metadata.news_id == row.sim_news_id)
+            .scalar()
+        )
+
         return {
             "news_id": row.sim_news_id,
             "wdate": row.wdate.isoformat() if row.wdate else None,
@@ -403,6 +422,7 @@ def find_news_similar_v3(
             "image": row.image,
             "summary": row.summary,
             "similarity": row.similarity,
+            "stock_list": stock_list,  # ✅ 포함
         }
 
     return [convert(r) for r in results[:top_n]]

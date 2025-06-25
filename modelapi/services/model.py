@@ -825,6 +825,7 @@ async def get_news_recommended_ranked(payload, request, db):
                 "press",
                 "url",
                 "click_score",
+                "stock_list",
             ]
         ]
 

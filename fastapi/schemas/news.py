@@ -77,6 +77,7 @@ class NewsOut_v2(BaseModel):
     url: Optional[str]
     press: str
     image: str
+    stock_list: Optional[List[Dict[str, str]]] = []
 
     class Config:
         from_attributes = True
@@ -187,6 +188,7 @@ class TopNewsResponse(BaseModel):
     summary: str
     impact_score: float
     url: Optional[str]
+    stock_list: Optional[List[Dict[str, str]]] = []
 
     class Config:
         from_attributes = True
@@ -202,6 +204,7 @@ class RecommendNewsResponse(BaseModel):
     url: Optional[str]
     click_score: float
     recommend_reasons: List
+    stock_list: Optional[List[Dict[str, str]]] = []
 
     class Config:
         from_attributes = True
@@ -216,6 +219,7 @@ class SimilarNewsV2(BaseModel):
     image: str
     summary: str
     similarity: float
+    stock_list: Optional[List[Dict[str, str]]] = []
 
     class Config:
         from_attributes = True
