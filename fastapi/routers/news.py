@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from schemas.news import (
     News,
     News_v2,
+    NewsCountOut,
     NewsOut,
     NewsOut_v2,
     NewsOut_v2_External,
@@ -22,6 +23,7 @@ from schemas.news import (
 )
 from services.news import (
     find_news_similar_v3,
+    get_news_count,
     get_news_detail_v2_external,
     get_news_detail_v2_metadata,
     get_news_list,
@@ -218,6 +220,24 @@ async def list_news_v2(
         stock_list=stock_list,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
+    )
+
+
+@router_v2.get(
+    "/count",
+    response_model=NewsCountOut,
+    summary="[완료] 뉴스 개수 조회",
+    description="오늘, 전체 뉴스 개수 조회",
+)
+async def list_news(
+    db: Session = Depends(get_db),
+):
+    """
+    뉴스 개수를 조회합니다.
+    """
+    return await run_in_threadpool(
+        get_news_count,
+        db,
     )
 
 

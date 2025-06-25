@@ -10,6 +10,8 @@ from models.news import (
     NewsModel_v2_Similarity,
     ReportModel,
 )
+from sqlalchemy import func
+from datetime import datetime, date
 from fastapi.responses import JSONResponse
 from schemas.news import News, NewsOut_v2_External, SimilarNewsV2
 from sklearn.metrics.pairwise import cosine_similarity
@@ -57,9 +59,11 @@ def get_news_list_v2(
     start_datetime: Optional[datetime] = None,
     end_datetime: Optional[datetime] = None,
 ):
-    query = db.query(NewsModel_v2, NewsModel_v2_Metadata.stock_list).join(
-        NewsModel_v2_Metadata, NewsModel_v2.news_id == NewsModel_v2_Metadata.news_id
-    )
+    query = db.query(
+        NewsModel_v2,
+        NewsModel_v2_Metadata.stock_list,
+        NewsModel_v2_Metadata.impact_score,
+    ).join(NewsModel_v2_Metadata, NewsModel_v2.news_id == NewsModel_v2_Metadata.news_id)
 
     if title:
         query = query.filter(NewsModel_v2.title.ilike(f"%{title}%"))
@@ -86,12 +90,35 @@ def get_news_list_v2(
     results = query.order_by(desc(NewsModel_v2.wdate)).offset(skip).limit(limit).all()
 
     response = []
-    for news_obj, stock_list_value in results:
-        news_dict = {**news_obj.__dict__, "stock_list": stock_list_value}
+    for news_obj, stock_list_value, impact_score in results:
+        news_dict = {
+            **news_obj.__dict__,
+            "stock_list": stock_list_value,
+            "impact_score": impact_score,
+        }
         news_dict.pop("_sa_instance_state", None)
         response.append(news_dict)
 
     return response
+
+
+def get_news_count(db: Session):
+    # 전체 뉴스 개수
+    total_count = db.query(func.count()).select_from(NewsModel_v2).scalar()
+
+    # 오늘 뉴스 개수 (wdate가 datetime일 경우 날짜 비교)
+    today = date.today()
+    today_count = (
+        db.query(func.count())
+        .select_from(NewsModel_v2)
+        .filter(func.date(NewsModel_v2.wdate) == today)
+        .scalar()
+    )
+
+    return {
+        "news_count_total": total_count,
+        "news_count_today": today_count,
+    }
 
 
 def get_news_detail(db: Session, news_id: str):

@@ -28,6 +28,11 @@ class NewsOut(BaseModel):
     content: str
 
 
+class NewsCountOut(BaseModel):
+    news_count_total: int
+    news_count_today: int
+
+
 class NewsStock(BaseModel):
     news_id: str
     stocks: List[str]
@@ -78,6 +83,7 @@ class NewsOut_v2(BaseModel):
     press: str
     image: str
     stock_list: Optional[List[Dict[str, str]]] = []
+    impact_score: float
 
     class Config:
         from_attributes = True
