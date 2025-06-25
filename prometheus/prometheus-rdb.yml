@@ -15,4 +15,4 @@ scrape_configs:
 - job_name: node
   static_configs:
   - targets:
-    - localhost:9100  # 또는 node_exporter가 띄워진 서버 IP:포트
+    - 172.31.7.231:9100  # 또는 node_exporter가 띄워진 서버 IP:포트
