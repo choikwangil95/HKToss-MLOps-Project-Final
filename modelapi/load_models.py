@@ -190,7 +190,7 @@ class NewsTossChatbot:
             - HTML 출력 예시:
 
             <div style="margin-bottom: 24px;">
-            <h3 style="margin: 0 0 8px 0; font-size: 22px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 22px !important;">
                 <a href="https://n.news.naver.com/mnews/article/015/0005063326" target="_blank" style="text-decoration: none; color: #0070f3;">
                 <strong>하이브 상장 때 4000억 따로 챙긴 방시혁…당국, 제재 여부 검토</strong>
                 </a>
@@ -258,7 +258,7 @@ class NewsTossChatbot:
                 f"<img src=\"{row['image']}\" alt=\"뉴스 이미지\">\n"
                 f"{row['summary']}\n"
                 f"{row['wdate'][:10]}\n"
-                f"(유사도: {0.3 + row.get('similarity', 0):.2f})"
+                f"(유사도: {0.5 + row.get('similarity', 0):.2f})"
             )
             retrieved_infos.append(info)
 
