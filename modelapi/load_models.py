@@ -211,7 +211,7 @@ class NewsTossChatbot:
             - **마크다운 대신 아래 HTML 구조만 허용됩니다.**
 
             <br />
-            <h3 style="margin-top: 10px; font-size: 21px;">아래와 같은 질문도 함께 참고해보세요!</h3>
+            <h3 style="margin-top: 10px; font-size: 21px !important;">아래와 같은 질문도 함께 참고해보세요!</h3>
             <br />
                 <p>▸ 하이브 상장 당시 방시혁 의장의 계약 내용은 무엇이었나요?</p>
                 <p>▸ 과거 IPO 주관사 선정 과정에서 어떤 이슈들이 있었나요?</p>
