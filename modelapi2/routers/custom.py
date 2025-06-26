@@ -82,7 +82,7 @@ async def get_news_embedding_router(request: Request, payload: SimilarNewsIn):
     description="뉴스 GPT 챗봇",
 )
 async def chat_stream_endpoint(request: Request, payload: ChatIn):
-    return await run_in_threadpool(get_stream_response, request, payload)
+    return await get_stream_response(request, payload)
 
 
 @router.post(
@@ -92,7 +92,7 @@ async def chat_stream_endpoint(request: Request, payload: ChatIn):
     description="뉴스 추천 후보군",
 )
 async def get_news_recommend(request: Request, payload: RecommendIn):
-    return await run_in_threadpool(get_news_recommended, payload, request)
+    return await get_news_recommended(payload, request)
 
 
 @router.post(
@@ -107,7 +107,7 @@ async def get_news_recommend(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    results = await run_in_threadpool(get_news_recommended_ranked, payload, request, db)
+    results = await get_news_recommended_ranked(payload, request, db)
 
     # Prometheus용 헤더 추가
     click_mean = np.mean([result["click_score"] for result in results[:5]])
