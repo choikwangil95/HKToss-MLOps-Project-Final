@@ -83,7 +83,7 @@ class NewsTossChatbot:
 
     def search_similar_news(self, query_text, top_k=2):
         # Step 1: 첫 번째 API로 query_text 기반 가장 유사한 뉴스 1개 찾기
-        first_url = "http://15.165.211.100:8000/news/similar"
+        first_url = "http://15.164.44.39/:8000/news/similar"
         response = requests.post(first_url, json={"article": query_text, "top_k": 2})
         response.raise_for_status()
         top_news = response.json()["similar_news_list"]
