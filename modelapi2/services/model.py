@@ -20,9 +20,12 @@ from models.custom import (
     NewsModel_v2_Topic,
 )
 import shap
+import json
 
 import ast
 import pandas as pd
+import time
+from datetime import datetime
 
 
 async def get_news_embeddings(article_list, request):
@@ -124,7 +127,7 @@ async def get_news_similar_list(payload, request):
     return news_similar_list[:top_k]
 
 
-# ✅ 전역 Redis 연결 재사용
+# 전역 Redis 연결
 redis_conn = redis.Redis(
     host="3.39.99.26",
     port=6379,
@@ -132,106 +135,81 @@ redis_conn = redis.Redis(
     decode_responses=True,
 )
 
-# ✅ 전역 ThreadPoolExecutor (스레드 재사용)
+# 전역 ThreadPoolExecutor
 redis_executor = ThreadPoolExecutor(max_workers=10)
 
 
-# ✅ Redis 비동기 전송 함수
-def send_to_redis_async(data: dict):
-    def task():
-        try:
-            redis_conn.publish("chat-response", json.dumps(data, ensure_ascii=False))
-        except Exception as e:
-            print(f"[Redis Error] {type(e).__name__}: {e}")
-
-    redis_executor.submit(task)
+# Redis 전송 함수
+def send_to_redis(data: dict):
+    try:
+        redis_conn.publish("chat-response", json.dumps(data, ensure_ascii=False))
+    except Exception as e:
+        print(f"[Redis Error] {type(e).__name__}: {e}")
 
 
-# ✅ SSE 응답
+# 🔁 전체 처리 로직 (백그라운드에서 실행됨)
+def process_chat_and_publish(chatbot, payload):
+    try:
+        start = time.time()
+        print(f"[{datetime.now()}] 🔵 Background 작업 시작")
+
+        t1 = time.time()
+        messages = chatbot.make_stream_prompt(payload.question, top_k=2)
+        print(
+            f"[{datetime.now()}] ✅ make_stream_prompt 완료 ({time.time() - t1:.2f}s)"
+        )
+
+        t2 = time.time()
+        stream = chatbot.get_client().chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=messages,
+            temperature=0.4,
+            max_tokens=1024,
+            stream=True,
+        )
+        print(f"[{datetime.now()}] ✅ GPT 스트리밍 준비 완료 ({time.time() - t2:.2f}s)")
+
+        idx = 0
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            content = getattr(delta, "content", None)
+            if content:
+                data = {
+                    "client_id": payload.client_id,
+                    "content": content,
+                    "is_last": False,
+                    "index": idx,
+                }
+                send_to_redis(data)
+                idx += 1
+
+        # 마지막 메시지
+        data = {
+            "client_id": payload.client_id,
+            "content": "",
+            "is_last": True,
+            "index": idx,
+        }
+        send_to_redis(data)
+        print(
+            f"[{datetime.now()}] ✅ Redis 전송 완료 (총 {idx+1}개, {time.time() - start:.2f}s 소요)"
+        )
+
+    except Exception as e:
+        print(f"[❌ Background Error] {type(e).__name__}: {e}")
+
+
+# ✅ FastAPI 엔드포인트 함수
 async def get_stream_response(request, payload):
+    print(f"[{datetime.now()}] 🟢 요청 수신 → 백그라운드 실행 시작")
     chatbot = request.app.state.chatbot
     loop = asyncio.get_event_loop()
 
-    # 프롬프트 생성 (동기 → 비동기)
-    messages = await loop.run_in_executor(
-        None, chatbot.make_stream_prompt, payload.question, 2
-    )
+    # 전체 처리 백그라운드 실행
+    loop.run_in_executor(None, process_chat_and_publish, chatbot, payload)
 
-    client = chatbot.get_client()
-    stream = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=messages,
-        temperature=0.4,
-        max_tokens=1024,
-        stream=True,
-    )
-
-    queue = asyncio.Queue()
-
-    def lookahead_iter(iterator):
-        """마지막 여부를 알려주는 제너레이터 (yield (is_last, item))"""
-        it = iter(iterator)
-        try:
-            prev = next(it)
-        except StopIteration:
-            return
-
-        for val in it:
-            yield False, prev
-            prev = val
-        yield True, prev  # 마지막
-
-    last_sent = False  # 마지막 true가 나갔는지 추적
-
-    def produce_chunks():
-        nonlocal last_sent
-        idx = 0  # 인덱스 추가
-        try:
-            for is_last, chunk in lookahead_iter(stream):
-                delta = chunk.choices[0].delta
-                content = getattr(delta, "content", None)
-
-                if content:
-                    data = {
-                        "client_id": payload.client_id,
-                        "content": content,
-                        "is_last": is_last,
-                        "index": idx,  # 인덱스 부여
-                    }
-                    idx += 1  # 인덱스 증가
-                    if is_last:
-                        last_sent = True
-
-                    send_to_redis_async(data)
-                    msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-                    asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
-        finally:
-            # 혹시 마지막 is_last가 안 나갔으면 강제로 전송
-            if not last_sent:
-                data = {
-                    "client_id": payload.client_id,
-                    "content": "",  # 또는 None
-                    "is_last": True,
-                    "index": idx,  # 마지막 인덱스
-                }
-                send_to_redis_async(data)
-                msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-                asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
-
-            asyncio.run_coroutine_threadsafe(queue.put(None), loop)
-
-    # 백그라운드로 실행
-    loop.run_in_executor(None, produce_chunks)
-
-    # 비동기 스트림
-    async def event_stream():
-        while True:
-            item = await queue.get()
-            if item is None:
-                break
-            yield item
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    print(f"[{datetime.now()}] 🟢 응답 즉시 반환")
+    return {"message": "처리 중입니다. Redis 채널(chat-response)로 전송됩니다."}
 
 
 async def get_embedding_batch(article_list, request):
