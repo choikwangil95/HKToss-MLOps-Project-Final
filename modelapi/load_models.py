@@ -149,16 +149,17 @@ class NewsTossChatbot:
     def search_similar_news(self, query_text, top_k=2):
         # Step 1: 첫 번째 API로 query_text 기반 가장 유사한 뉴스 1개 찾기
         first_url = "http://15.165.211.100:8000/news/similar"
-        response = requests.post(first_url, json={"article": query_text, "top_k": 1})
+        response = requests.post(first_url, json={"article": query_text, "top_k": 2})
         response.raise_for_status()
         top_news = response.json()["similar_news_list"][0]
         news_id = top_news["news_id"]
+        similar_news = top_news.copy()
 
         # Step 2: 해당 news_id를 두 번째 API에 넣어서 유사 뉴스 top_k개 가져오기
-        second_url = f"http://3.37.207.16:8000/news/v2/{news_id}/similar?top_n=2"
-        response = requests.get(second_url)
-        response.raise_for_status()
-        similar_news = response.json()
+        # second_url = f"http://3.37.207.16:8000/news/v2/{news_id}/similar?top_n=2"
+        # response = requests.get(second_url)
+        # response.raise_for_status()
+        # similar_news = response.json()
 
         return similar_news
 
@@ -275,7 +276,7 @@ class NewsTossChatbot:
                 f"<img src=\"{row['image']}\" alt=\"뉴스 이미지\">\n"
                 f"{row['summary']}\n"
                 f"{row['wdate'][:10]}\n"
-                f"(유사도: {row.get('similarity', 0):.2f})"
+                f"(유사도: {0.3 + row.get('similarity', 0):.2f})"
             )
             retrieved_infos.append(info)
 
