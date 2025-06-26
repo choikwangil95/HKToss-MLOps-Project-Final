@@ -1,4 +1,5 @@
 from news_pipeline import (
+    clean_market_data,
     enrich_stock_list,
     extract_industries,
     NewsMarketPipeline,
@@ -149,6 +150,8 @@ def job(
         pipeline = NewsMarketPipeline(news_list=news_list, df_base_rate=df_base_rate)
 
         market_datas = pipeline.run()
+
+        market_datas = clean_market_data(market_datas)
 
         if market_datas:
             save_to_db_external(market_datas)

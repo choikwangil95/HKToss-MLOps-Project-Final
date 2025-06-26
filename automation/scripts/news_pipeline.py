@@ -1428,6 +1428,27 @@ def scale_impact_score(value, threshold=0.3):
         return 0
 
 
+import math
+
+
+def clean_market_data(data_list: list[dict]) -> list[dict]:
+    cleaned = []
+    for row in data_list:
+        cleaned_row = {}
+        for k, v in row.items():
+            # 숫자형이고, NaN, inf, -inf 체크
+            if isinstance(v, (float, int)):
+                if v is None or math.isnan(v) or math.isinf(v):
+                    cleaned_row[k] = 0
+                else:
+                    cleaned_row[k] = v
+            else:
+                # 숫자형이 아닌 경우 그대로
+                cleaned_row[k] = v
+        cleaned.append(cleaned_row)
+    return cleaned
+
+
 if __name__ == "__main__":
     log.info("로그 테스트: news_pipeline.py 직접 실행됨")
     fetch_latest_news()
