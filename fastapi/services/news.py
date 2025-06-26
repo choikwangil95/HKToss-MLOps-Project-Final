@@ -755,7 +755,7 @@ def get_news_recommended(user_id, db):
 
     try:
         response = requests.post(
-            "http://15.165.211.100:8000/news/recommend",
+            "http://15.164.44.39:8000/news/recommend",
             json={
                 "news_clicked_ids": clicked_news_ids[:10],
                 "news_candidate_ids": candidate_news_ids,
@@ -774,7 +774,7 @@ def get_news_recommended(user_id, db):
     t4 = time.perf_counter()
     try:
         response = requests.post(
-            "http://15.165.211.100:8000/news/recommend/rerank",
+            "http://15.164.44.39:8000/news/recommend/rerank",
             json={"user_id": user_id, "news_ids": news_recomended_candidates_ids},
         )
         response.raise_for_status()

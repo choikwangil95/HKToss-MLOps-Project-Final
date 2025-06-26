@@ -10,7 +10,7 @@ services:
       - "8000:8000"
     volumes:
       - ./modelapi2:/modelapi2
-    command: gunicorn main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers=1
+    command: gunicorn main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers=5
     environment:
       - ENABLE_METRICS=true
 
