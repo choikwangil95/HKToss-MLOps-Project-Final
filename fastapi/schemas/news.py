@@ -83,7 +83,7 @@ class NewsOut_v2(BaseModel):
     press: str
     image: str
     stock_list: Optional[List[Dict[str, str]]] = []
-    impact_score: float
+    impact_score: Optional[float]
 
     class Config:
         from_attributes = True
