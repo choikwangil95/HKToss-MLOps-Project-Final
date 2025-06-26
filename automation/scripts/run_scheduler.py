@@ -1,5 +1,5 @@
 from news_pipeline import (
-    clean_market_data,
+    drop_invalid_rows,
     enrich_stock_list,
     extract_industries,
     NewsMarketPipeline,
@@ -151,7 +151,7 @@ def job(
 
         market_datas = pipeline.run()
 
-        market_datas = clean_market_data(market_datas)
+        market_datas = drop_invalid_rows(market_datas)
 
         if market_datas:
             save_to_db_external(market_datas)

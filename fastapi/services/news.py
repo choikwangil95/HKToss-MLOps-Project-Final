@@ -658,6 +658,10 @@ def collect_member_news_data(
 def get_news_recommended(user_id, db):
     start_all = time.perf_counter()
 
+    use_other_user = False
+    user_click_count = 0
+    other_user_data = None
+
     # 1. 클릭 로그 조회
     t0 = time.perf_counter()
 
@@ -674,11 +678,15 @@ def get_news_recommended(user_id, db):
         user_id, start_date, end_date
     )
 
+    user_click_count = len(unique_news_ids)
+
     print(f"[TIME] 사용자 클릭 로그 수집: {time.perf_counter() - t0:.3f}s")
 
     # 2. 유사 사용자 대체 로직
-    if len(unique_news_ids) == 0:
+    if len(unique_news_ids) < 5:
         t1 = time.perf_counter()
+
+        use_other_user = True
 
         # 현재 사용자
         try:
@@ -704,6 +712,8 @@ def get_news_recommended(user_id, db):
         matched_user = next(
             (u for u in user_data_all if u["invest_score"] == user_invest_score), None
         )
+
+        other_user_data = matched_user.copy()
 
         if matched_user:
             user_id = matched_user["user_id"]
@@ -777,4 +787,9 @@ def get_news_recommended(user_id, db):
 
     print(f"[TIME] 전체 추천 소요 시간: {time.perf_counter() - start_all:.3f}s")
 
-    return news_recomended_list
+    return {
+        "user_click_count": user_click_count,
+        "use_other_user": use_other_user,
+        "other_user_data": other_user_data,
+        "news_data": news_recomended_list,
+    }

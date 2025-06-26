@@ -1441,21 +1441,16 @@ def scale_impact_score(value, threshold=0.3):
 import math
 
 
-def clean_market_data(data_list: list[dict]) -> list[dict]:
+def drop_invalid_rows(data_list):
     cleaned = []
     for row in data_list:
-        cleaned_row = {}
-        for k, v in row.items():
-            # 숫자형이고, NaN, inf, -inf 체크
-            if isinstance(v, (float, int)):
-                if v is None or math.isnan(v) or math.isinf(v):
-                    cleaned_row[k] = 0
-                else:
-                    cleaned_row[k] = v
-            else:
-                # 숫자형이 아닌 경우 그대로
-                cleaned_row[k] = v
-        cleaned.append(cleaned_row)
+        # invalid value가 하나라도 있으면 그 row는 제외
+        if any(
+            v is None or (isinstance(v, float) and (math.isnan(v) or math.isinf(v)))
+            for v in row.values()
+        ):
+            continue  # 무시
+        cleaned.append(row)
     return cleaned
 
 

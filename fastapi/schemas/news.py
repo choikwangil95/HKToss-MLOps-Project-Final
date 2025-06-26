@@ -213,7 +213,7 @@ class TopNewsResponse(BaseModel):
         from_attributes = True
 
 
-class RecommendNewsResponse(BaseModel):
+class RecommendNews(BaseModel):
     news_id: str
     wdate: datetime  # 날짜+시간
     title: str
@@ -224,6 +224,13 @@ class RecommendNewsResponse(BaseModel):
     click_score: float
     recommend_reasons: List
     stock_list: Optional[List[Dict[str, str]]] = []
+
+
+class RecommendNewsResponse(BaseModel):
+    user_click_count: int
+    use_other_user: bool
+    other_user_data: Optional[Dict]
+    news_data: List[RecommendNews]
 
     class Config:
         from_attributes = True

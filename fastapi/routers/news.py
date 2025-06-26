@@ -268,7 +268,7 @@ async def get_top_impact_news_api(
 
 @router_v2.get(
     "/recommend",
-    response_model=list[RecommendNewsResponse],
+    response_model=RecommendNewsResponse,
     summary="뉴스 맞춤 추천",
     description="뉴스 맞춤 추천",
 )
