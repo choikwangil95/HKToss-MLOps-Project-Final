@@ -20,6 +20,7 @@ from news_pipeline import (
     save_to_db,
     save_to_db_similar,
     save_to_db_topics,
+    scale_impact_score,
     send_to_redis,
     update_db_external,
     update_db_impact_score,
