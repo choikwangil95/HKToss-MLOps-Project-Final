@@ -34,7 +34,6 @@ from services.model import (
     get_stream_response,
     compute_similarity,
 )
-import requests
 
 from services.custom import get_news_impact_score_service
 
@@ -42,13 +41,6 @@ from schemas.custom import SimpleImpactResponse
 
 import numpy as np
 
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel
-import openai
-import os
-import json
-from load_models import get_similarity_model
-import asyncio
 from sqlalchemy.orm import Session
 from db.postgresql import get_db
 from models.custom import (

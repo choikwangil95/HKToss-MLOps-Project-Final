@@ -1,0 +1,52 @@
+# Web server & routing
+fastapi
+uvicorn
+gunicorn
+
+# Data processing & transformation
+numpy
+pandas
+
+# ML inference & training
+scikit-learn
+joblib
+
+# Schema validation
+pydantic
+
+# Monitoring & metrics
+prometheus-fastapi-instrumentator 
+prometheus-client
+
+# Database & ORM
+sqlalchemy
+psycopg2
+pgvector
+
+# dvc
+dvc[s3]
+
+# DB 연결 및 ORM 라이브러리
+sqlalchemy>=1.4
+
+konlpy
+scikit-learn
+onnxruntime
+onnx
+tokenizers
+
+
+chromadb
+langchain
+langchain-community
+langchain-chroma
+
+# LLM API
+openai
+
+# HTTP
+requests
+redis
+
+lightgbm
+shap

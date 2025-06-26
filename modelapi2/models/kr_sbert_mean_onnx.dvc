@@ -1,0 +1,6 @@
+outs:
+- md5: 8197a8cc1475e84ac1b2c1cb3a56fc5a.dir
+  size: 465975764
+  nfiles: 2
+  hash: md5
+  path: kr_sbert_mean_onnx
