@@ -31,6 +31,7 @@ from services.model import (
     get_news_similar_list,
     get_stream_response,
 )
+from starlette.concurrency import run_in_threadpool
 
 from schemas.custom import SimpleImpactResponse
 
@@ -64,7 +65,7 @@ async def get_news_embedding_router(request: Request, payload: SimilarNewsIn):
             detail="기사 본문이 비어있습니다. 올바른 본문을 입력해주세요.",
         )
 
-    similar_news_list = get_news_similar_list(payload, request)
+    similar_news_list = await get_news_similar_list(payload, request)
     if similar_news_list is None:
         raise HTTPException(
             status_code=500,
@@ -81,7 +82,7 @@ async def get_news_embedding_router(request: Request, payload: SimilarNewsIn):
     description="뉴스 GPT 챗봇",
 )
 async def chat_stream_endpoint(request: Request, payload: ChatIn):
-    return await get_stream_response(request, payload)
+    return await run_in_threadpool(get_stream_response, request, payload)
 
 
 @router.post(
@@ -91,7 +92,7 @@ async def chat_stream_endpoint(request: Request, payload: ChatIn):
     description="뉴스 추천 후보군",
 )
 async def get_news_recommend(request: Request, payload: RecommendIn):
-    return await get_news_recommended(payload, request)
+    return await run_in_threadpool(get_news_recommended, payload, request)
 
 
 @router.post(
@@ -106,7 +107,7 @@ async def get_news_recommend(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    results = await get_news_recommended_ranked(payload, request, db)
+    results = await run_in_threadpool(get_news_recommended_ranked, payload, request, db)
 
     # Prometheus용 헤더 추가
     click_mean = np.mean([result["click_score"] for result in results[:5]])

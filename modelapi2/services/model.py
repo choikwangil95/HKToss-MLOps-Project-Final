@@ -70,7 +70,7 @@ def safe_parse_list(val):
     return val if isinstance(val, list) else []
 
 
-def get_news_similar_list(payload, request):
+async def get_news_similar_list(payload, request):
     """
     유사 뉴스 top_k
     """
@@ -254,7 +254,7 @@ async def get_embedding_batch(article_list, request):
     return all_embeddings
 
 
-def get_news_metadata_df(news_ids: list) -> pd.DataFrame:
+async def get_news_metadata_df(news_ids: list) -> pd.DataFrame:
     """
     뉴스 ID 목록을 받아 각 뉴스의 메타데이터를 조회하여 DataFrame으로 반환
     :param news_ids: 뉴스 ID 문자열 리스트 (예: ['20250513_0092', '20250618_28735495'])
@@ -295,8 +295,8 @@ async def get_news_recommended(payload, request):
     news_candidate_ids = payload.news_candidate_ids
 
     # 임베딩
-    news_clicked_metadata = get_news_metadata_df(news_clicked_ids)
-    news_candidate_medatata = get_news_metadata_df(news_candidate_ids)
+    news_clicked_metadata = await get_news_metadata_df(news_clicked_ids)
+    news_candidate_medatata = await get_news_metadata_df(news_candidate_ids)
 
     news_clicked_summaries = news_clicked_metadata["summary"].tolist()
     news_candidate_summaries = news_candidate_medatata["summary"].tolist()
