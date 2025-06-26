@@ -1402,9 +1402,9 @@ def request_impact_score(news_id):
 
         d_plus = r.json().get("d_plus", [])
         impact_score = r.json().get("impact_score", 0)
-        scale_impact_score = scale_impact_score(impact_score)
+        scaled_impact_score = scale_impact_score(impact_score)
 
-        return {"news_id": news_id, "score": scale_impact_score, "d_plus": d_plus}
+        return {"news_id": news_id, "score": scaled_impact_score, "d_plus": d_plus}
 
     except Exception as e:
         print(f"❌ {news_id} 뉴스 중요도 예측 실패: {e}")
