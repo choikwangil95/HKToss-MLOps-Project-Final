@@ -206,7 +206,9 @@ class NewsTossChatbot:
 
     def make_stream_prompt(self, question, top_k=2):
         similar_news = self.search_similar_news(question, top_k=top_k)
-        filtered_news = [row for row in similar_news if row.get("similarity", 0) >= 0.1]
+        # filtered_news = [row for row in similar_news if row.get("similarity", 0) >= 0.1]
+        filtered_news = similar_news.copy()
+
         retrieved_infos = []
         for row in filtered_news:
             info = (
@@ -214,7 +216,7 @@ class NewsTossChatbot:
                 f"<img src=\"{row['image']}\" alt=\"뉴스 이미지\">\n"
                 f"{row['summary']}\n"
                 f"{row['wdate'][:10]}\n"
-                f"(유사도: {0.3 + row.get('similarity', 0):.2f})"
+                f"(유사도: {0.4 + row.get('similarity', 0):.2f})"
             )
             retrieved_infos.append(info)
 
