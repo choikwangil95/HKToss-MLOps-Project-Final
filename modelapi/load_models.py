@@ -151,7 +151,7 @@ class NewsTossChatbot:
         first_url = "http://15.165.211.100:8000/news/similar"
         response = requests.post(first_url, json={"article": query_text, "top_k": 2})
         response.raise_for_status()
-        top_news = response.json()["similar_news_list"][0]
+        top_news = response.json()["similar_news_list"]
         news_id = top_news["news_id"]
         similar_news = top_news.copy()
 
