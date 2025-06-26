@@ -152,7 +152,7 @@ class NewsTossChatbot:
         response = requests.post(first_url, json={"article": query_text, "top_k": 2})
         response.raise_for_status()
         top_news = response.json()["similar_news_list"]
-        news_id = top_news["news_id"]
+        # news_id = top_news["news_id"]
         similar_news = top_news.copy()
 
         # Step 2: 해당 news_id를 두 번째 API에 넣어서 유사 뉴스 top_k개 가져오기
