@@ -275,6 +275,10 @@ def save_to_db_similar(articles):
         ON CONFLICT (news_id, sim_news_id) DO NOTHING;
         """
 
+        delete_query = """
+        DELETE FROM news_v2 WHERE news_id = %s;
+        """
+
         total_inserted = 0
 
         for article in articles:
@@ -285,8 +289,18 @@ def save_to_db_similar(articles):
                 r.raise_for_status()
                 similar_news_list = r.json()
             except Exception as e:
-                print(f"❌ {news_id} 유사뉴스 조회 실패: {e}")
-                continue  # 이 뉴스는 스킵
+                log.warning(
+                    f"❌ {news_id} 유사뉴스 조회 실패 → news_v2에서 삭제 시도: {e}"
+                )
+                try:
+                    cur.execute(delete_query, (news_id,))
+                    conn.commit()
+                    log.info(f"🗑️ news_v2에서 {news_id} 삭제 완료")
+                except Exception as delete_err:
+                    log.error(
+                        f"❌ {news_id} 삭제 실패 ({type(delete_err).__name__}): {delete_err}"
+                    )
+                continue  # 실패한 뉴스 스킵
 
             values = [
                 (
