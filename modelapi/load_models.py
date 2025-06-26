@@ -252,7 +252,7 @@ class NewsTossChatbot:
         similar_news = self.search_similar_news(question, top_k=top_k)
         # filtered_news = [row for row in similar_news if row.get("similarity", 0) >= 0.1]
         retrieved_infos = []
-        for row in filtered_news:
+        for row in similar_news:
             info = (
                 f"{row['title']} ({row['url']})\n"
                 f"<img src=\"{row['image']}\" alt=\"뉴스 이미지\">\n"
