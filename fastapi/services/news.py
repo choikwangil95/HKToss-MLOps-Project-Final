@@ -655,7 +655,7 @@ def collect_member_news_data(
     return unique_news_ids, click_log_df
 
 
-def get_news_recommended(user_id, db):
+async def get_news_recommended(user_id, db):
     start_all = time.perf_counter()
 
     use_other_user = False
