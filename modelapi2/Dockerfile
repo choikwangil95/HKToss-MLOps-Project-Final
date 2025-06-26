@@ -23,7 +23,7 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 # 5. 앱 코드 복사
-WORKDIR /modelapi
+WORKDIR /modelapi2
 COPY . .
 
 # 6. 포트 오픈
