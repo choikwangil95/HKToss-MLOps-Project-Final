@@ -263,55 +263,51 @@ def save_to_db_similar(articles):
         log.info("저장할 뉴스 없음")
         return
 
-    conn = None  # ✅ 먼저 None으로 초기화
-    cur = None
-
-    for article in articles:
-        news_id = article["news_id"]
-
-        try:
-            url = f"http://fastapi:8000/news/v2/{news_id}/similar/realtime"
-
-            r = requests.get(url, timeout=5)
-            r.raise_for_status()
-
-            similar_news_list = r.json()
-
-        except Exception as e:
-            print(f"❌ {news_id} 유사뉴스 조회 실패: {e}")
+    DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@db:5432/news_db")
 
     try:
-        DB_URL = os.getenv(
-            "DATABASE_URL", "postgresql://postgres:password@db:5432/news_db"
-        )
         conn = psycopg2.connect(DB_URL)
         cur = conn.cursor()
 
         insert_query = """
-		INSERT INTO news_v2_similar (news_id, sim_news_id, wdate, title, summary, press, url, image, similarity)
-		VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-		ON CONFLICT (news_id, sim_news_id) DO NOTHING;
-		"""
+        INSERT INTO news_v2_similar (news_id, sim_news_id, wdate, title, summary, press, url, image, similarity)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (news_id, sim_news_id) DO NOTHING;
+        """
 
-        values = [
-            (
-                article["news_id"],
-                similar_news["news_id"],
-                datetime.fromisoformat(similar_news["wdate"]),
-                similar_news["title"],
-                similar_news["summary"],
-                similar_news["press"],
-                similar_news["url"],
-                similar_news["image"],
-                similar_news["similarity"],
-            )
-            for similar_news in similar_news_list
-        ]
+        total_inserted = 0
 
-        execute_batch(cur, insert_query, values)
+        for article in articles:
+            news_id = article["news_id"]
+            try:
+                url = f"http://fastapi:8000/news/v2/{news_id}/similar/realtime"
+                r = requests.get(url, timeout=5)
+                r.raise_for_status()
+                similar_news_list = r.json()
+            except Exception as e:
+                print(f"❌ {news_id} 유사뉴스 조회 실패: {e}")
+                continue  # 이 뉴스는 스킵
+
+            values = [
+                (
+                    news_id,
+                    sn["news_id"],
+                    datetime.fromisoformat(sn["wdate"]),
+                    sn["title"],
+                    sn["summary"],
+                    sn["press"],
+                    sn["url"],
+                    sn["image"],
+                    sn["similarity"],
+                )
+                for sn in similar_news_list
+            ]
+
+            execute_batch(cur, insert_query, values)
+            total_inserted += len(values)
+
         conn.commit()
-
-        log.info(f"🧾 실시간 유사 뉴스 DB 저장 완료: {len(values)}건 저장")
+        log.info(f"🧾 실시간 유사 뉴스 DB 저장 완료: {total_inserted}건 저장")
 
     except Exception as e:
         log.error(f"❌ 실시간 유사 뉴스 DB 저장 중 오류 ({type(e).__name__}): {e}")
