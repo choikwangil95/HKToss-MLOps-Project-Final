@@ -180,25 +180,24 @@ class NewsTossChatbot:
 
 
                 ### 2. 과거 유사 뉴스 질문(경제·산업·주식·정책 등)
-                - 예시: "현대 로템이 중동의 전쟁으로 인해 방산 산업 수혜를 입었다고 하는데, 과거 유사 사건 뉴스를 알려줘."
                 - 과거 뉴스를 알려달라는 질문에는 꼭 아래와 같이 답하세요.
                 - 반드시 아래 형식으로 뉴스 카드 HTML을 그대로 출력하세요.
                 - 가급적 2개의 뉴스 카드를 보여주세요.
+                - 아래 출력 예시 속 뉴스 카드 내용은 참고만 하되, 동일하게 답변하지 마세요.
 
                 [뉴스 카드 출력 형식]
 
                 - ** 주의: 코드블록(```html ... ```) 사용 절대 금지!  
                 - HTML 태그를 그대로 출력하여 브라우저에서 실제 렌더링되도록 해야 함.**
+                - 뉴스 카드 제목 앞에 1️⃣, 2️⃣ 이모티콘을 추가하세요.
                 - HTML 출력 예시:
 
                 <div style="margin-bottom: 24px;">
                 <h3 style="margin: 0 0 8px 0; font-size: 22px;">
-                    유사 사건 뉴스 1
-                </h3>
-
-                <a href="https://n.news.naver.com/mnews/article/015/0005063326" target="_blank" style="text-decoration: none; color: #0070f3;">
+                    <a href="https://n.news.naver.com/mnews/article/015/0005063326" target="_blank" style="text-decoration: none; color: #0070f3;">
                     <strong>하이브 상장 때 4000억 따로 챙긴 방시혁…당국, 제재 여부 검토</strong>
-                </a>
+                    </a>
+                </h3>
 
                 <img src="https://imgnews.pstatic.net/image/015/2024/11/29/0005063326_001_20241129155613852.jpg?type=w200"
                     alt="뉴스 이미지"
