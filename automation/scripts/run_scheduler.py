@@ -163,6 +163,8 @@ def job(
                 news_id = item.get("news_id")
                 item["impact_score"] = score_map.get(news_id, 0.0)
 
+            ner_news = [item for item in ner_news if item["impact_score"] != 0.0]
+
             save_to_db(ner_news)
 
             save_to_db_metadata(ner_news)
