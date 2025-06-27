@@ -167,11 +167,11 @@ def job(
 
             save_to_db_metadata(ner_news)
 
-            send_to_redis(ner_news)
-
             update_db_impact_score(score_datas)
 
             update_db_external(score_datas)
+
+            send_to_redis(ner_news)
 
             # 슬랙 메세지 보내기
             push_slack_news_list_with_images(ner_news)
