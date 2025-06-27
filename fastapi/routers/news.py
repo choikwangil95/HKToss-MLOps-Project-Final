@@ -279,7 +279,7 @@ async def get_news_summary_router(
     """
     뉴스 맞춤 추천
     """
-    return await run_in_threadpool(get_news_recommended, user_id, db)
+    return await get_news_recommended(user_id, db)
 
 
 @router_v2.get(
