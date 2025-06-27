@@ -121,11 +121,12 @@ class NewsTossChatbot:
             [뉴스 카드 출력 형식]
             - ** 주의: 코드블록(```html ... ```) 사용 절대 금지!  
             - HTML 태그를 그대로 출력하여 브라우저에서 실제 렌더링되도록 해야 함.**
-            - 뉴스 카드 제목 앞에 1️⃣, 2️⃣ 이모티콘을 추가하세요.
+            - 뉴스 카드 제목 윗줄에 유사 뉴스 1️⃣, 유사 뉴스 2️⃣ 를 표시하세요.
             - HTML 출력 예시:
 
             <div style="margin-bottom: 24px;">
             <h3 style="margin: 0 0 8px 0; font-size: 22px !important;">
+                <strong>유사 뉴스 1️⃣</strong>
                 <a href="https://n.news.naver.com/mnews/article/015/0005063326" target="_blank" style="text-decoration: none; color: #0070f3;">
                 <strong>하이브 상장 때 4000억 따로 챙긴 방시혁…당국, 제재 여부 검토</strong>
                 </a>
