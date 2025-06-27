@@ -98,7 +98,7 @@ class NewsTossChatbot:
 
         return similar_news
 
-   def build_prompt(self, context, question):
+    def build_prompt(self, context, question):
         system_prompt = """
             당신은 주식 투자에 도움을 주는 전문 AI 챗봇, '뉴스토스'입니다.  
             아래 3가지 질문 유형에 따라 답변 기준을 철저히 지키며 경제, 금융, 주식과 연관지어 답변하세요. 
