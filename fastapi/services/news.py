@@ -750,9 +750,6 @@ async def get_news_recommended(user_id, db):
     clicked_news_ids = unique_news_ids.copy()
     candidate_news_ids = [news["news_id"] for news in top_news]
 
-    print(f"{clicked_news_ids} 클릭 news ids")
-    print(f"{candidate_news_ids} 후보 news ids")
-
     try:
         response = requests.post(
             "http://15.164.44.39:8000/news/recommend",
