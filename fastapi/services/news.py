@@ -713,9 +713,8 @@ async def get_news_recommended(user_id, db):
             (u for u in user_data_all if u["invest_score"] == user_invest_score), None
         )
 
-        other_user_data = matched_user.copy()
-
         if matched_user:
+            other_user_data = matched_user.copy()
             user_id = matched_user["user_id"]
 
             try:
