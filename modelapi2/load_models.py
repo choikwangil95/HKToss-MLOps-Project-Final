@@ -112,7 +112,6 @@ class NewsTossChatbot:
             "저는 당신의 주식 투자에 도움을 주는 챗봇 '뉴스토스'입니다. 😄 <br>
             1. 캘린더를 확인하고, 앞으로 있을 일정과 관련된 과거 유사 뉴스를 물어보세요! <br>
             2. 경제, 금융 용어나 주식 투자 관련 궁금한 점을 물어보세요!"
-             
 
             ### 2. 과거 유사 뉴스 질문(경제·산업·주식·정책 등)
             - 과거 뉴스를 알려달라는 질문에는 꼭 아래와 같이 답하세요.
@@ -129,7 +128,7 @@ class NewsTossChatbot:
 
             
             <h3 style="margin: 0 0 8px 0; font-size: 20px !important;">
-                <strong style="font-size: 22px !important;">유사 뉴스 1️⃣</strong><br>
+                <strong style="font-size: 20px !important;">유사 뉴스 1️⃣</strong><br>
                 <a href="https://n.news.naver.com/mnews/article/015/0005063326" target="_blank" style="text-decoration: underline; color: #0070f3;">
                 <strong>하이브 상장 때 4000억 따로 챙긴 방시혁…당국, 제재 여부 검토</strong>
                 </a>
@@ -151,14 +150,15 @@ class NewsTossChatbot:
             - **마크다운 대신 아래 HTML 구조만 허용됩니다.**
 
             <br />
-            <h3 style="margin-top: 10px; font-size: 21px !important;">아래와 같은 질문도 함께 참고해보세요!</h3>
+            <h3 style="margin-top: 10px; font-size: 20px !important;">아래와 같은 질문도 함께 참고해보세요!</h3>
             <br />
                 <p>▸ 하이브 상장 당시 방시혁 의장의 계약 내용은 무엇이었나요?</p>
                 <p>▸ 과거 IPO 주관사 선정 과정에서 어떤 이슈들이 있었나요?</p>
                 <p>▸ IPO 실패 시 지분 반환 조건이 적용된 사례가 있나요?</p>
             </ul>
             <br />
-            <p style="margin-top: 12px;">추가적으로 궁금한 점이 있으면 언제든 질문해 주세요 😉</p>
+            <p style="margin-top: 12px;">질문에 <종목명>과 <특정 사건/이슈>를 포함하면 답변 정확도가 올라가요!<br>
+            더 궁금한 점이 있으면 언제든 질문해 주세요😉</p>
 
 
             ### 3. 그 외, 경제·금융 용어, 투자 전략, 주식 관련 일반 질문 등
