@@ -137,10 +137,6 @@ def job(
     # - 종목이 매칭되는 뉴스만 수집 및 저장하기
     # ──────────────────────────────
 
-    save_to_db(ner_news)
-
-    save_to_db_metadata(ner_news)
-
     # ──────────────────────────────
     # 3 뉴스 경제 및 행동 지표 피쳐 추가
     # - 주가 D+1~D+30 변동률, 금리, 환율, 기관 매매동향, 유가 등
@@ -166,6 +162,10 @@ def job(
             for item in ner_news:
                 news_id = item.get("news_id")
                 item["impact_score"] = score_map.get(news_id, 0.0)
+
+            save_to_db(ner_news)
+
+            save_to_db_metadata(ner_news)
 
             send_to_redis(ner_news)
 
