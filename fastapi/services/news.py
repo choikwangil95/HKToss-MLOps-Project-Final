@@ -215,7 +215,7 @@ def extract_d_minus_1_info(news: dict) -> dict:
     if not stock_list or not isinstance(stock_list, list):
         return {}
 
-    ticker = str(stock_list[-1]["stock_id"]).zfill(6)
+    ticker = stock_list[-1]["stock_id"]
 
     # d-1 및 fallback 날짜 문자열 생성
     fallback_dates = [d_minus_1 - timedelta(days=i) for i in range(0, 10)]
@@ -298,9 +298,6 @@ def reconstruct_absolute_values_with_d1_base(external: dict, d1_base: dict) -> d
             result[key] = round(close_d1 * (1 - pct), 2)
 
     return result
-
-
-import time
 
 
 def retry(func, retries=3, delay=0.5):
