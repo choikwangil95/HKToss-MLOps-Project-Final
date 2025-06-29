@@ -27,6 +27,19 @@ from datetime import datetime, timedelta
 import random
 import time
 
+import pandas as pd
+import ast
+import numpy as np
+import os
+from pykrx import stock
+import requests
+from datetime import timedelta
+from tqdm import tqdm
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 def get_news_list(
     db: Session,
@@ -161,19 +174,185 @@ def get_news_detail_v2_metadata(db: Session, news_id: str):
     }
 
 
+def extract_d_minus_1_info(news: dict) -> dict:
+    # 날짜 처리
+    news_date = pd.to_datetime(news["wdate"]).normalize()
+    year, month = news_date.year, news_date.month
+
+    # 전달 계산
+    if month == 1:
+        prev_year, prev_month = year - 1, 12
+    else:
+        prev_year, prev_month = year, month - 1
+
+    # 거래일 수집 (해당 월 + 전달)
+    trading_days = []
+    for y, m in [(prev_year, prev_month), (year, month)]:
+        try:
+            days = stock.get_previous_business_days(year=y, month=m)
+            trading_days.extend(days)
+        except:
+            continue
+    trading_days = pd.to_datetime(sorted(set(trading_days)))
+
+    # D-day (뉴스일 기준 가장 가까운 거래일)
+    d_day_idx = trading_days.searchsorted(news_date, side="right") - 1
+    if d_day_idx < 0:
+        return {}
+
+    d_day = trading_days[d_day_idx]
+    d_minus_1_idx = d_day_idx - 1
+    if d_minus_1_idx < 0:
+        return {}
+
+    d_minus_1 = trading_days[d_minus_1_idx]
+
+    # Ticker 추출
+    stock_list = news.get("stock_list", [])
+    if not stock_list or not isinstance(stock_list, list):
+        return {}
+
+    ticker = str(stock_list[-1]["stock_id"]).zfill(6)
+
+    # d-1 및 fallback 날짜 문자열 생성
+    fallback_dates = [d_minus_1 - timedelta(days=i) for i in range(0, 10)]
+    fallback_dates_str = [d.strftime("%Y%m%d") for d in fallback_dates]
+
+    # OHLCV 수집
+    try:
+        ohlcv = stock.get_market_ohlcv_by_date(
+            min(fallback_dates_str), max(fallback_dates_str), ticker
+        ).reset_index()
+        ohlcv.rename(columns={"날짜": "date"}, inplace=True)
+        ohlcv["ticker"] = ticker
+    except:
+        ohlcv = pd.DataFrame()
+
+    # 수급 데이터 수집
+    try:
+        trade = stock.get_market_trading_value_by_date(
+            min(fallback_dates_str), max(fallback_dates_str), ticker
+        ).reset_index()
+        trade.rename(columns={"날짜": "date"}, inplace=True)
+        trade["ticker"] = ticker
+    except:
+        trade = pd.DataFrame()
+
+    # fallback: 가장 가까운 날짜의 값
+    def get_latest(source_df, cols):
+        for d in fallback_dates:
+            row = source_df[(source_df["date"] == d) & (source_df["ticker"] == ticker)]
+            if not row.empty:
+                return row.iloc[0][cols].to_dict()
+        return {col: None for col in cols}
+
+    ohlcv_vals = get_latest(ohlcv, ["종가", "거래량"])
+    trade_vals = get_latest(trade, ["개인", "기관합계", "외국인합계"])
+
+    return {
+        "news_id": news["news_id"],
+        "d_minus_1_close": ohlcv_vals["종가"],
+        "d_minus_1_volume": ohlcv_vals["거래량"],
+        "d_minus_1_individual": trade_vals["개인"],
+        "d_minus_1_institution": trade_vals["기관합계"],
+        "d_minus_1_foreign": trade_vals["외국인합계"],
+    }
+
+
+def reconstruct_absolute_values_with_d1_base(external: dict, d1_base: dict) -> dict:
+    import numpy as np
+
+    result = external.copy()
+
+    # D-1 기준값
+    d1 = {
+        "close": d1_base.get("d_minus_1_close", 0),
+        "volume": d1_base.get("d_minus_1_volume", 0),
+        "foreign": d1_base.get("d_minus_1_foreign", 0),
+        "institution": d1_base.get("d_minus_1_institution", 0),
+        "individual": d1_base.get("d_minus_1_individual", 0),
+    }
+
+    # D-1 값도 반영해줌
+    for key, val in d1.items():
+        result[f"d_minus_1_date_{key}"] = val
+
+    # D-5 ~ D-2 역변환 (변화율 → 절대값)
+    for i in range(5, 1, -1):
+        prefix = f"d_minus_{i}"
+        for k in d1.keys():
+            pct = external.get(f"{prefix}_date_{k}", None)
+            base = d1[k]
+            if pct is not None and base != 0:
+                result[f"{prefix}_date_{k}"] = round(base * (1 - pct), 2)
+
+    # D+1 ~ D+5 역변환 (수익률 → 절대값)
+    close_d1 = d1["close"]
+    for i in range(1, 6):
+        key = f"d_plus_{i}_date_close"
+        pct = external.get(key, None)
+        if pct is not None and close_d1 != 0:
+            result[key] = round(close_d1 * (1 - pct), 2)
+
+    return result
+
+
 def get_news_detail_v2_external(db: Session, news_id: str):
+    # 1. 뉴스 기본 정보 가져오기
     news = (
+        db.query(
+            NewsModel_v2.news_id,
+            NewsModel_v2.wdate,
+            NewsModel_v2_Metadata.stock_list,
+        )
+        .join(
+            NewsModel_v2_Metadata,
+            NewsModel_v2.news_id == NewsModel_v2_Metadata.news_id,
+        )
+        .filter(NewsModel_v2.news_id == news_id)
+        .first()
+    )
+
+    if news is None:
+        raise HTTPException(status_code=404, detail="News not found")
+
+    news_dict = {
+        "news_id": news[0],
+        "wdate": news[1],
+        "stock_list": news[2],
+    }
+
+    # 2. D-1 기준값 계산
+    d_minus_1_info = extract_d_minus_1_info(news_dict)
+    print("[D-1 기준값]", d_minus_1_info)
+
+    # 3. 외부 데이터 가져오기
+    news_external = (
         db.query(NewsModel_v2_External)
         .filter(NewsModel_v2_External.news_id == news_id)
         .first()
     )
 
-    print(news)
+    if news_external is None:
+        raise HTTPException(status_code=404, detail="External data not found")
 
-    if news is None:
-        raise HTTPException(status_code=404, detail="News not found")
+    # 4. ORM → dict 변환
+    news_external_dict = {
+        col.name: getattr(news_external, col.name)
+        for col in NewsModel_v2_External.__table__.columns
+    }
 
-    return NewsOut_v2_External.model_validate(news)
+    # 5 기준값으로 덮어쓰기 (핵심!)
+    for key, value in d_minus_1_info.items():
+        if key.startswith("d_minus_1_"):
+            news_external_dict[key] = value
+
+    # 6 역변환
+    data = reconstruct_absolute_values_with_d1_base(news_external_dict, d_minus_1_info)
+    print("[복원된 데이터]", data)
+
+    # 7 복원된 값으로 DTO 리턴
+    return NewsOut_v2_External(**data)
 
 
 def find_news_similar(
