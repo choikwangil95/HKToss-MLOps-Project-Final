@@ -215,7 +215,7 @@ def extract_d_minus_1_info(news: dict) -> dict:
     if not stock_list or not isinstance(stock_list, list):
         return {}
 
-    ticker = stock_list[-1]["stock_id"]
+    ticker = str(stock_list[-1]["stock_id"]).zfill(6)
 
     # d-1 및 fallback 날짜 문자열 생성
     fallback_dates = [d_minus_1 - timedelta(days=i) for i in range(0, 10)]
@@ -337,7 +337,7 @@ def get_news_detail_v2_external(db: Session, news_id: str):
 
     # 2. D-1 기준값 계산
     with pykrx_lock:
-        d_minus_1_info = retry(lambda: extract_d_minus_1_info(news_dict))
+        d_minus_1_info = extract_d_minus_1_info(news_dict)
     print("[D-1 기준값]", d_minus_1_info)
 
     # 3. 외부 데이터 가져오기
