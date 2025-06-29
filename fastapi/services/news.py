@@ -35,6 +35,9 @@ from pykrx import stock
 import requests
 from datetime import timedelta
 from tqdm import tqdm
+import threading
+
+pykrx_lock = threading.Lock()
 
 from dotenv import load_dotenv
 
@@ -297,6 +300,19 @@ def reconstruct_absolute_values_with_d1_base(external: dict, d1_base: dict) -> d
     return result
 
 
+import time
+
+
+def retry(func, retries=3, delay=0.5):
+    for i in range(retries):
+        try:
+            return func()
+        except Exception as e:
+            if i == retries - 1:
+                raise
+            time.sleep(delay)
+
+
 def get_news_detail_v2_external(db: Session, news_id: str):
     # 1. 뉴스 기본 정보 가져오기
     news = (
@@ -323,7 +339,8 @@ def get_news_detail_v2_external(db: Session, news_id: str):
     }
 
     # 2. D-1 기준값 계산
-    d_minus_1_info = extract_d_minus_1_info(news_dict)
+    with pykrx_lock:
+        d_minus_1_info = retry(lambda: extract_d_minus_1_info(news_dict))
     print("[D-1 기준값]", d_minus_1_info)
 
     # 3. 외부 데이터 가져오기
@@ -342,16 +359,11 @@ def get_news_detail_v2_external(db: Session, news_id: str):
         for col in NewsModel_v2_External.__table__.columns
     }
 
-    # 5 기준값으로 덮어쓰기 (핵심!)
-    for key, value in d_minus_1_info.items():
-        if key.startswith("d_minus_1_"):
-            news_external_dict[key] = value
-
-    # 6 역변환
+    # 5 역변환
     data = reconstruct_absolute_values_with_d1_base(news_external_dict, d_minus_1_info)
     print("[복원된 데이터]", data)
 
-    # 7 복원된 값으로 DTO 리턴
+    # 6 복원된 값으로 DTO 리턴
     return NewsOut_v2_External(**data)
 
 
