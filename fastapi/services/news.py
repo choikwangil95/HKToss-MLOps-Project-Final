@@ -288,28 +288,6 @@ def find_stock_effected(db: Session, news_id: str):
     return [{"news_id": news.news_id, "stocks": stocks}] if news.stocks else []
 
 
-########################### highlights ###############################
-
-# def get_top_news(db: Session, hours: int = 24, limit: int = 10) -> list[NewsModel_v2]:
-#     """24시간 내 상위 영향력 뉴스 조회"""
-#     time_threshold = datetime.utcnow() - timedelta(hours=hours)
-
-#     return db.query(NewsModel_v2).filter(
-#         NewsModel_v2.impact_score != None,
-#         NewsModel_v2.created_at >= time_threshold
-#     ).order_by(
-#         NewsModel_v2.impact_score.desc()
-#     ).limit(limit).all()
-
-# def get_top_news_by_date(db, start_datetime, end_datetime, limit=10):
-#     return db.query(NewsModel_v2).filter(
-#         NewsModel_v2.impact_score != None,
-#         NewsModel_v2.created_at >= start_datetime,
-#         NewsModel_v2.created_at < end_datetime
-#     ).order_by(
-#         NewsModel_v2.impact_score.desc()
-#     ).limit(limit).all()
-
 
 def get_top_impact_news(
     db: Session,
@@ -439,7 +417,7 @@ def find_news_similar_v2(
         response.raise_for_status()
         similar_news_list = response.json()["similar_news_list"]
     except Exception as e:
-        print(f"❌ 유사 뉴스 API 요청 실패: {e}")
+        print(f"유사 뉴스 API 요청 실패: {e}")
         return []
 
     # 필터링 조건 적용
@@ -483,7 +461,7 @@ def find_news_similar_v2(
         response.raise_for_status()
         similar_news_reranked_list = response.json()["results"]
     except Exception as e:
-        print(f"❌ 유사 뉴스 Rerank API 요청 실패: {e}")
+        print(f"유사 뉴스 Rerank API 요청 실패: {e}")
         print(f"텍스트 유사도만 조회하도록 합니다.: {e}")
 
         similar_news_reranked_list = filtered_output
@@ -627,20 +605,6 @@ def get_news_recommended(user_id, db):
 
     # 사용자 클릭 로그 없는 경우 비슷한 유저의 클릭 뉴스 로그를 가져온다
     if len(unique_news_ids) == 0:
-        # 사용자 정보 가져오기
-
-        # url = f"http://43.200.17.139:8080/api/v1/userinfo/{user_id}"
-
-        # try:
-        #     response = requests.get(url)
-        #     response.raise_for_status()
-        #     user_data = response.json()["data"]
-
-        #     print(f"✅ 사용자 {user_id} 정보 조회 성공")
-        # except Exception as e:
-        #     print(f"❌ 사용자 {user_id} 정보 조회 실패: {str(e)}")
-
-        # pass
 
         top_news = get_top_impact_news(
             db=db,

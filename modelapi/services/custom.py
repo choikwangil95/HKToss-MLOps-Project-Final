@@ -11,7 +11,7 @@ from services.model import get_news_embeddings
 
 
 def create_engineered_features_complete(df: pd.DataFrame) -> pd.DataFrame:
-    """특성공학 함수 - 첨부된 코드와 동일"""
+    """특성공학 함수"""
     df = df.copy()
     print("특성공학 시작...")
     print(f"특성공학 전 컬럼 수: {len(df.columns)}")
@@ -82,7 +82,7 @@ def create_engineered_features_complete(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def get_complete_external_cols():
-    """외부 특성 컬럼 순서 정의 - 첨부된 코드와 동일"""
+    """외부 특성 컬럼 순서 정의"""
     group_macro = ["fx", "bond10y", "base_rate"]  # 3개
     group_volume = [
         "d_minus_5_date_volume",
@@ -148,7 +148,7 @@ def get_complete_external_cols():
 
 
 def apply_scaling_complete(df: pd.DataFrame, fitted_scalers: dict) -> tuple:
-    """스케일링 적용 - 첨부된 코드와 동일"""
+    """스케일링 적용"""
     df_scaled = df.copy()
     external_cols, groups = get_complete_external_cols()
 
@@ -173,7 +173,7 @@ def apply_scaling_complete(df: pd.DataFrame, fitted_scalers: dict) -> tuple:
 
 
 def get_news_data_from_db(news_id: str, db: Session) -> dict:
-    """DB에서 뉴스 관련 모든 데이터 조회 - 실제 모델 사용"""[5]
+    """DB에서 뉴스 관련 모든 데이터 조회"""[5]
     print(f"DB에서 뉴스 데이터 조회: {news_id}")
 
     # 3개 테이블 조인하여 모든 데이터 한 번에 조회
@@ -311,7 +311,7 @@ async def predict_and_calculate_impact(data: dict, request: Request):
 
     # 5. 임베딩 생성
     embedding = await get_news_embeddings([row["summary"]], request)
-    embedding = np.array([embedding[0]], dtype=np.float32)  # ✅ 2D로 reshape
+    embedding = np.array([embedding[0]], dtype=np.float32)  
     print(f"임베딩 형태: {embedding.shape}")
 
     # 6. 외부 특성 벡터 생성
@@ -342,9 +342,7 @@ async def predict_and_calculate_impact(data: dict, request: Request):
     baseline_mean = [-0.0078573, -0.0083497, -0.00810895, -0.00799404, -0.00891119]
     baseline_std = [0.06588189, 0.07283064, 0.07710478, 0.08238087, 0.08863377]
 
-    z_scores = (np.array(predicted_closes) - np.array(baseline_mean)) / np.array(
-        baseline_std
-    )
+    z_scores = (np.array(predicted_closes) - np.array(baseline_mean)) / np.array(baseline_std)
 
     # 9. 과거 종가 추출
     historical_closes = [

@@ -322,7 +322,7 @@ async def get_news_recommend(
 )
 async def get_news_impact_score(
     request: Request,
-    response: Response,  # ✅ 추가
+    response: Response, 
     news_id: str = Path(..., description="뉴스 고유 ID", min_length=1),
     db: Session = Depends(get_db),
 ):
@@ -333,7 +333,6 @@ async def get_news_impact_score(
         news_id, db, request
     )  # request 전달
 
-    # ✅ z_scores를 헤더에 JSON 형식으로 추가
     z_score_mean = float(np.mean(z_scores))
     response.headers["X-model-score"] = str(z_score_mean)  # Prometheus용 헤더 추가
 
