@@ -1,0 +1,5 @@
+outs:
+- md5: 29bee44cefdb16c5e0570209b155177e
+  size: 3604184
+  hash: md5
+  path: lgbm_model2.pkl

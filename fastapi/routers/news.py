@@ -5,10 +5,12 @@ from sqlalchemy.orm import Session
 from schemas.news import (
     News,
     News_v2,
+    NewsCountOut,
     NewsOut,
     NewsOut_v2,
     NewsOut_v2_External,
     NewsOut_v2_Metadata,
+    NewsOut_v2_detail,
     RecommendNewsResponse,
     RecommendedNewsV2,
     SimilarNews,
@@ -21,6 +23,7 @@ from schemas.news import (
 )
 from services.news import (
     find_news_similar_v3,
+    get_news_count,
     get_news_detail_v2_external,
     get_news_detail_v2_metadata,
     get_news_list,
@@ -221,6 +224,24 @@ async def list_news_v2(
 
 
 @router_v2.get(
+    "/count",
+    response_model=NewsCountOut,
+    summary="[완료] 뉴스 개수 조회",
+    description="오늘, 전체 뉴스 개수 조회",
+)
+async def list_news(
+    db: Session = Depends(get_db),
+):
+    """
+    뉴스 개수를 조회합니다.
+    """
+    return await run_in_threadpool(
+        get_news_count,
+        db,
+    )
+
+
+@router_v2.get(
     "/highlights",
     response_model=list[TopNewsResponse],
     summary="[완료] 주요 뉴스 목록 조회",
@@ -247,23 +268,23 @@ async def get_top_impact_news_api(
 
 @router_v2.get(
     "/recommend",
-    response_model=list[RecommendNewsResponse],
+    response_model=RecommendNewsResponse,
     summary="뉴스 맞춤 추천",
     description="뉴스 맞춤 추천",
 )
 async def get_news_summary_router(
-    user_id: Optional[str] = Query(None, description="유저 고유 ID (선택)"),
+    user_id: str = Query(description="유저 고유 ID (선택)"),
     db: Session = Depends(get_db),
 ):
     """
     뉴스 맞춤 추천
     """
-    return await run_in_threadpool(get_news_recommended, user_id, db)
+    return await get_news_recommended(user_id, db)
 
 
 @router_v2.get(
     "/{news_id}",
-    response_model=NewsOut_v2,
+    response_model=NewsOut_v2_detail,
     summary="[완료] 뉴스 상세 조회",
     description="뉴스 ID를 기반으로 해당 뉴스 기사의 상세 정보를 조회합니다.",
 )

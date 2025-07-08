@@ -1,4 +1,5 @@
 from news_pipeline import (
+    drop_invalid_rows,
     enrich_stock_list,
     extract_industries,
     NewsMarketPipeline,
@@ -20,6 +21,7 @@ from news_pipeline import (
     save_to_db,
     save_to_db_similar,
     save_to_db_topics,
+    scale_impact_score,
     send_to_redis,
     update_db_external,
     update_db_impact_score,
@@ -135,10 +137,6 @@ def job(
     # - 종목이 매칭되는 뉴스만 수집 및 저장하기
     # ──────────────────────────────
 
-    save_to_db(ner_news)
-
-    save_to_db_metadata(ner_news)
-
     # ──────────────────────────────
     # 3 뉴스 경제 및 행동 지표 피쳐 추가
     # - 주가 D+1~D+30 변동률, 금리, 환율, 기관 매매동향, 유가 등
@@ -149,7 +147,13 @@ def job(
 
         market_datas = pipeline.run()
 
+        market_datas = drop_invalid_rows(market_datas)
+
         if market_datas:
+            save_to_db(ner_news)
+
+            save_to_db_metadata(ner_news)
+
             save_to_db_external(market_datas)
 
             score_datas = get_impact_score(market_datas)
@@ -163,11 +167,13 @@ def job(
                 news_id = item.get("news_id")
                 item["impact_score"] = score_map.get(news_id, 0.0)
 
-            send_to_redis(ner_news)
+            ner_news = [item for item in ner_news if item["impact_score"] != 0.0]
 
             update_db_impact_score(score_datas)
 
             update_db_external(score_datas)
+
+            send_to_redis(ner_news)
 
             # 슬랙 메세지 보내기
             push_slack_news_list_with_images(ner_news)

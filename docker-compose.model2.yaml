@@ -1,7 +1,7 @@
 services:
   modelapi:
     build:
-      context: ./modelapi
+      context: ./modelapi2
       dockerfile: Dockerfile
     container_name: modelapi-app
     env_file:
@@ -9,8 +9,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./modelapi:/modelapi
-    command: gunicorn main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers=1
+      - ./modelapi2:/modelapi2
+    command: gunicorn main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers=6
     environment:
       - ENABLE_METRICS=true
 

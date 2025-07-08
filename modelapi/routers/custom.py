@@ -34,7 +34,6 @@ from services.model import (
     get_stream_response,
     compute_similarity,
 )
-import requests
 
 from services.custom import get_news_impact_score_service
 
@@ -42,13 +41,6 @@ from schemas.custom import SimpleImpactResponse
 
 import numpy as np
 
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel
-import openai
-import os
-import json
-from load_models import get_similarity_model
-import asyncio
 from sqlalchemy.orm import Session
 from db.postgresql import get_db
 from models.custom import (
@@ -133,7 +125,7 @@ async def chat_stream_endpoint(request: Request, payload: ChatIn):
 async def get_similarity_scores(
     request: Request,
     payload: SimilarityRequest,
-    response=Response,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     # 로드된 모델 가져오기
@@ -280,8 +272,8 @@ async def get_similarity_scores(
     results.sort(key=lambda x: x["score"], reverse=True)
 
     # Prometheus용 헤더 추가
-    similarity_mean = np.mean([result["score"] for result in results])
-    similarity_variance = np.var([result["score"] for result in results])
+    similarity_mean = np.mean([result["score"] for result in results[:5]])
+    similarity_variance = np.var([result["score"] for result in results[:5]])
 
     response.headers["X-similarity-mean-score"] = f"{similarity_mean:.3f}"
     response.headers["X-similarity-variance-score"] = f"{similarity_variance:.6f}"
@@ -311,7 +303,16 @@ async def get_news_recommend(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    return await get_news_recommended_ranked(payload, request, db)
+    results = await get_news_recommended_ranked(payload, request, db)
+
+    # Prometheus용 헤더 추가
+    click_mean = np.mean([result["click_score"] for result in results[:5]])
+    click_variance = np.var([result["click_score"] for result in results[:5]])
+
+    response.headers["X-click-mean-score"] = f"{click_mean:.3f}"
+    response.headers["X-click-variance-score"] = f"{click_variance:.6f}"
+
+    return results
 
 
 @router.get(

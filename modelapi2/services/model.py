@@ -20,135 +20,12 @@ from models.custom import (
     NewsModel_v2_Topic,
 )
 import shap
+import json
 
 import ast
 import pandas as pd
-
-
-def get_news_summary(
-    text,
-    request,
-    max_length=128,
-    no_repeat_ngram_size=3,
-    repetition_penalty=1.2,
-) -> str:
-    """
-    뉴스 본문을 요약하는 함수입니다.
-    실제 요약 로직은 외부 모델이나 라이브러리를 사용하여 구현해야 합니다.
-    """
-    encoder_sess = request.app.state.encoder_sess_summarize
-    decoder_sess = request.app.state.decoder_sess_summarize
-    tokenizer = request.app.state.tokenizer_summarize
-
-    text = text.strip()[:300]
-
-    input_ids = tokenizer.encode(text).ids
-    input_ids_np = np.array([input_ids], dtype=np.int64)
-    attention_mask = np.ones_like(input_ids_np, dtype=np.int64)
-
-    encoder_outputs = encoder_sess.run(
-        None, {"input_ids": input_ids_np, "attention_mask": attention_mask}
-    )[0]
-
-    decoder_input_ids = [tokenizer.token_to_id("<s>")]
-    generated_ids = decoder_input_ids.copy()
-
-    for _ in range(max_length):
-        decoder_input_np = np.array([generated_ids], dtype=np.int64)
-        decoder_inputs = {
-            "input_ids": decoder_input_np,
-            "encoder_hidden_states": encoder_outputs,
-            "encoder_attention_mask": attention_mask,
-        }
-        logits = decoder_sess.run(None, decoder_inputs)[0]
-        next_token_logits = logits[:, -1, :]
-
-        # repetition penalty 적용
-        for token_id in set(generated_ids):
-            next_token_logits[0, token_id] /= repetition_penalty
-
-        # no_repeat_ngram_size 적용
-        if no_repeat_ngram_size > 0 and len(generated_ids) >= no_repeat_ngram_size:
-            ngram = tuple(generated_ids[-(no_repeat_ngram_size - 1) :])
-            banned = {
-                tuple(generated_ids[i : i + no_repeat_ngram_size])
-                for i in range(len(generated_ids) - no_repeat_ngram_size + 1)
-            }
-            for token_id in range(next_token_logits.shape[-1]):
-                if ngram + (token_id,) in banned:
-                    next_token_logits[0, token_id] = -1e9  # 큰 마이너스
-
-        # greedy 선택
-        next_token_id = int(np.argmax(next_token_logits, axis=-1)[0])
-
-        if next_token_id == tokenizer.token_to_id("</s>"):
-            break
-
-        generated_ids.append(next_token_id)
-
-    summary = tokenizer.decode(generated_ids, skip_special_tokens=True)
-
-    return summary
-
-
-def get_ner_tokens(text, request, id2label):
-    """
-    뉴스 본문에서 개체명 인식을 수행하는 함수입니다.
-    """
-    tokenizer = request.app.state.tokenizer_ner
-    session = request.app.state.session_ner
-
-    # 🟡 토큰화 및 입력값 준비
-    encoding = tokenizer.encode(text)
-    input_ids = np.array([encoding.ids], dtype=np.int64)
-    attention_mask = np.ones_like(input_ids, dtype=np.int64)
-    token_type_ids = np.zeros_like(input_ids, dtype=np.int64)
-
-    # 🔵 ONNX 추론 실행
-    inputs = {
-        "input_ids": input_ids,
-        "attention_mask": attention_mask,
-        "token_type_ids": token_type_ids,
-    }
-
-    logits = session.run(None, inputs)[0]  # shape: (1, seq_len, num_labels)
-
-    # 🔵 라벨 인덱스 → 실제 라벨명
-    preds = np.argmax(logits, axis=-1)[0]
-    labels = [id2label[p] for p in preds[: len(encoding.tokens)]]
-
-    # 🔵 시각화
-    tokens = encoding.tokens
-
-    return tokens, labels
-
-
-def extract_ogg_economy(tokens, labels, target_label="OGG_ECONOMY"):
-    merged_words = []
-    current_word = ""
-
-    for token, label in zip(tokens, labels):
-        token_clean = token.replace("##", "") if token.startswith("##") else token
-
-        if label == f"B-{target_label}":
-            if current_word:
-                merged_words.append(current_word)
-            current_word = token_clean
-
-        elif label == f"I-{target_label}":
-            current_word += token_clean
-
-        else:
-            if current_word:
-                merged_words.append(current_word)
-                current_word = ""
-
-    if current_word:
-        merged_words.append(current_word)
-
-    stock_list = merged_words.copy()
-
-    return stock_list
+import time
+from datetime import datetime
 
 
 async def get_news_embeddings(article_list, request):
@@ -196,7 +73,7 @@ def safe_parse_list(val):
     return val if isinstance(val, list) else []
 
 
-def get_news_similar_list(payload, request):
+async def get_news_similar_list(payload, request):
     """
     유사 뉴스 top_k
     """
@@ -250,44 +127,7 @@ def get_news_similar_list(payload, request):
     return news_similar_list[:top_k]
 
 
-def get_lda_topic(text, request):
-    lda_model = request.app.state.lda_model
-    count_vectorizer = request.app.state.count_vectorizer
-    stopwords = request.app.state.stopwords
-
-    # 2. 형태소 분석기 및 불용어 로드
-    okt = Okt()
-
-    # 3. 텍스트 정제 함수
-    def clean_text(text):
-        text = re.sub(r"\[.*?\]|\(.*?\)", "", text)
-        text = re.sub(r"[^가-힣\s]", "", text)
-        text = re.sub(r"\s+", " ", text).strip()
-        return text
-
-    # 4. 명사 추출 함수
-    def extract_nouns(text):
-        nouns = okt.nouns(text)
-        nouns = [word for word in nouns if word not in stopwords and len(word) > 1]
-        return " ".join(nouns)
-
-    # 5. 데이터 전처리 (정제 + 명사 추출)
-    processed_texts = [extract_nouns(clean_text(text))]
-
-    # 6. 벡터라이즈 (DTM 생성)
-    new_dtm = count_vectorizer.transform(processed_texts)
-
-    # 7. LDA 토픽 분포 예측
-    topic_distribution = lda_model.transform(new_dtm)
-
-    lda_topics = {}
-    for index, value in enumerate(topic_distribution[0]):
-        lda_topics[f"topic_{index+1}"] = value
-
-    return lda_topics
-
-
-# ✅ 전역 Redis 연결 재사용
+# 전역 Redis 연결
 redis_conn = redis.Redis(
     host="3.39.99.26",
     port=6379,
@@ -295,259 +135,81 @@ redis_conn = redis.Redis(
     decode_responses=True,
 )
 
-# ✅ 전역 ThreadPoolExecutor (스레드 재사용)
+# 전역 ThreadPoolExecutor
 redis_executor = ThreadPoolExecutor(max_workers=10)
 
 
-# ✅ Redis 비동기 전송 함수
-def send_to_redis_async(data: dict):
-    def task():
-        try:
-            redis_conn.publish("chat-response", json.dumps(data, ensure_ascii=False))
-        except Exception as e:
-            print(f"[Redis Error] {type(e).__name__}: {e}")
-
-    redis_executor.submit(task)
+# Redis 전송 함수
+def send_to_redis(data: dict):
+    try:
+        redis_conn.publish("chat-response", json.dumps(data, ensure_ascii=False))
+    except Exception as e:
+        print(f"[Redis Error] {type(e).__name__}: {e}")
 
 
-# ✅ SSE 응답
+# 🔁 전체 처리 로직 (백그라운드에서 실행됨)
+def process_chat_and_publish(chatbot, payload):
+    try:
+        start = time.time()
+        print(f"[{datetime.now()}] 🔵 Background 작업 시작")
+
+        t1 = time.time()
+        messages = chatbot.make_stream_prompt(payload.question, top_k=2)
+        print(
+            f"[{datetime.now()}] ✅ make_stream_prompt 완료 ({time.time() - t1:.2f}s)"
+        )
+
+        t2 = time.time()
+        stream = chatbot.get_client().chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=messages,
+            temperature=0.4,
+            max_tokens=1024,
+            stream=True,
+        )
+        print(f"[{datetime.now()}] ✅ GPT 스트리밍 준비 완료 ({time.time() - t2:.2f}s)")
+
+        idx = 0
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            content = getattr(delta, "content", None)
+            if content:
+                data = {
+                    "client_id": payload.client_id,
+                    "content": content,
+                    "is_last": False,
+                    "index": idx,
+                }
+                send_to_redis(data)
+                idx += 1
+
+        # 마지막 메시지
+        data = {
+            "client_id": payload.client_id,
+            "content": "",
+            "is_last": True,
+            "index": idx,
+        }
+        send_to_redis(data)
+        print(
+            f"[{datetime.now()}] ✅ Redis 전송 완료 (총 {idx+1}개, {time.time() - start:.2f}s 소요)"
+        )
+
+    except Exception as e:
+        print(f"[❌ Background Error] {type(e).__name__}: {e}")
+
+
+# ✅ FastAPI 엔드포인트 함수
 async def get_stream_response(request, payload):
+    print(f"[{datetime.now()}] 🟢 요청 수신 → 백그라운드 실행 시작")
     chatbot = request.app.state.chatbot
     loop = asyncio.get_event_loop()
 
-    # 프롬프트 생성 (동기 → 비동기)
-    messages = await loop.run_in_executor(
-        None, chatbot.make_stream_prompt, payload.question, 2
-    )
+    # 전체 처리 백그라운드 실행
+    loop.run_in_executor(None, process_chat_and_publish, chatbot, payload)
 
-    client = chatbot.get_client()
-    stream = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=messages,
-        temperature=0.4,
-        max_tokens=1024,
-        stream=True,
-    )
-
-    queue = asyncio.Queue()
-
-    def lookahead_iter(iterator):
-        """마지막 여부를 알려주는 제너레이터 (yield (is_last, item))"""
-        it = iter(iterator)
-        try:
-            prev = next(it)
-        except StopIteration:
-            return
-
-        for val in it:
-            yield False, prev
-            prev = val
-        yield True, prev  # 마지막
-
-    last_sent = False  # 마지막 true가 나갔는지 추적
-
-    def produce_chunks():
-        nonlocal last_sent
-        idx = 0  # 인덱스 추가
-        try:
-            for is_last, chunk in lookahead_iter(stream):
-                delta = chunk.choices[0].delta
-                content = getattr(delta, "content", None)
-
-                if content:
-                    data = {
-                        "client_id": payload.client_id,
-                        "content": content,
-                        "is_last": is_last,
-                        "index": idx,  # 인덱스 부여
-                    }
-                    idx += 1  # 인덱스 증가
-                    if is_last:
-                        last_sent = True
-
-                    send_to_redis_async(data)
-                    msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-                    asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
-        finally:
-            # 혹시 마지막 is_last가 안 나갔으면 강제로 전송
-            if not last_sent:
-                data = {
-                    "client_id": payload.client_id,
-                    "content": "",  # 또는 None
-                    "is_last": True,
-                    "index": idx,  # 마지막 인덱스
-                }
-                send_to_redis_async(data)
-                msg = f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-                asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
-
-            asyncio.run_coroutine_threadsafe(queue.put(None), loop)
-
-    # 백그라운드로 실행
-    loop.run_in_executor(None, produce_chunks)
-
-    # 비동기 스트림
-    async def event_stream():
-        while True:
-            item = await queue.get()
-            if item is None:
-                break
-            yield item
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
-
-
-# AE 인코딩 함수
-def run_ae(ae_sess, embedding):
-    input_name = ae_sess.get_inputs()[0].name
-    output_name = ae_sess.get_outputs()[0].name
-    return ae_sess.run([output_name], {input_name: embedding.astype(np.float32)})[0]
-
-
-# 그룹 단위 스케일링 함수 (그룹별 scaler 적용)
-def scale_ext_grouped(
-    ext: list, col_names: list, prefix: str, scalers: dict, group_key_map: dict
-):
-    grouped_data = {}
-    grouped_indices = {}
-    for idx, (col, val) in enumerate(zip(col_names, ext)):
-        group = group_key_map.get(col, None)
-        if group:
-            key = f"{prefix}_{group}"
-            grouped_data.setdefault(key, []).append(val)
-            grouped_indices.setdefault(key, []).append(idx)
-
-    scaled = ext.copy()
-    for key in grouped_data:
-        if key in scalers:
-            try:
-                values = np.array(grouped_data[key], dtype=np.float32).reshape(1, -1)
-                # transformed = scalers[key].transform(values)[0]
-
-                columns = scalers[key].feature_names_in_  # sklearn >=1.0
-                values_df = pd.DataFrame(values, columns=columns)
-                transformed = scalers[key].transform(values_df)[0]
-
-                for idx, val in zip(grouped_indices[key], transformed):
-                    scaled[idx] = val
-            except Exception as e:
-                print(f"❌ {key} 스케일 실패: {e}")
-                raise
-        else:
-            print(f"⚠️ {key} 스케일러 없음 → 원본 사용")
-
-    return np.array(scaled, dtype=np.float32)
-
-
-# 회귀 기반 유사 뉴스 유사도 계산 함수
-async def compute_similarity(
-    db: Session,
-    summary: str,
-    extA: list,
-    topicA: list,
-    similar_summaries: list,
-    extBs: list,
-    topicBs: list,
-    scalers,
-    ae_sess,
-    regressor_sess,
-    embedding_api_func,
-    ext_col_names: list,
-    topic_col_names: list,
-    news_topk_ids: list,
-):
-
-    # group_key_map 생성 (기준 + 유사 뉴스)
-    group_key_map = {}
-    for col in ext_col_names + topic_col_names:
-        if "date_close" in col:
-            group_key_map[col] = "price_close"
-        elif "date_volume" in col:
-            group_key_map[col] = "volume"
-        elif "date_foreign" in col:
-            group_key_map[col] = "foreign"
-        elif "date_institution" in col:
-            group_key_map[col] = "institution"
-        elif "date_individual" in col:
-            group_key_map[col] = "individual"
-        elif col in ["fx", "bond10y", "base_rate"]:
-            group_key_map[col] = "macro"
-        elif "토픽" in col:
-            group_key_map[col] = "topic"
-
-    for col in ext_col_names + topic_col_names:
-        col_sim = f"similar_{col}"
-        if "date_close" in col:
-            group_key_map[col_sim] = "price_close"
-        elif "date_volume" in col:
-            group_key_map[col_sim] = "volume"
-        elif "date_foreign" in col:
-            group_key_map[col_sim] = "foreign"
-        elif "date_institution" in col:
-            group_key_map[col_sim] = "institution"
-        elif "date_individual" in col:
-            group_key_map[col_sim] = "individual"
-        elif col in ["fx", "bond10y", "base_rate"]:
-            group_key_map[col_sim] = "macro"
-        elif "토픽" in col:
-            group_key_map[col_sim] = "topic"
-
-    # 텍스트 임베딩 + AE 인코딩
-    all_texts = [summary] + similar_summaries
-    embeddings = np.array(await embedding_api_func(all_texts))
-
-    embA, embBs = embeddings[0], embeddings[1:]
-    latentA = run_ae(ae_sess, embA.reshape(1, -1))[0]
-    latentBs = [run_ae(ae_sess, e.reshape(1, -1))[0] for e in embBs]
-
-    # 스케일링
-    extA_total = extA + topicA
-    extA_col_names = ext_col_names + topic_col_names
-    extA_scaled = scale_ext_grouped(
-        extA_total, extA_col_names, "extA", scalers, group_key_map
-    )
-
-    extB_total = [ext + topic for ext, topic in zip(extBs, topicBs)]
-    extB_col_names = [f"similar_{col}" for col in ext_col_names + topic_col_names]
-    extBs_scaled = [
-        scale_ext_grouped(extB, extB_col_names, "extB_similar", scalers, group_key_map)
-        for extB in extB_total
-    ]
-
-    # 회귀 예측
-    inputA_name = regressor_sess.get_inputs()[0].name
-    inputB_name = regressor_sess.get_inputs()[1].name
-    output_name = regressor_sess.get_outputs()[0].name
-
-    scores = []
-    for i, (latentB, extB_scaled) in enumerate(zip(latentBs, extBs_scaled)):
-        if extB_scaled.shape[0] != 42:
-            raise ValueError(
-                f"extB_scaled 길이 이상함! 기대: 42, 실제: {extB_scaled.shape[0]} | index: {i}"
-            )
-
-        featA = np.concatenate([latentA, extA_scaled]).reshape(1, -1).astype(np.float32)
-        featB = np.concatenate([latentB, extB_scaled]).reshape(1, -1).astype(np.float32)
-
-        score = regressor_sess.run(
-            [output_name], {inputA_name: featA, inputB_name: featB}
-        )[0][0][0]
-        scores.append(score)
-
-    # 결과 반환
-    results = list(zip(similar_summaries, scores, news_topk_ids))
-    results.sort(key=lambda x: -x[1])  # score 기준 내림차순 정렬
-
-    return [
-        {
-            "news_id": nid,
-            "summary": summ,
-            "wdate": "",
-            "score": float(score),
-            "rank": i + 1,
-        }
-        for i, (summ, score, nid) in enumerate(results)
-    ]
+    print(f"[{datetime.now()}] 🟢 응답 즉시 반환")
+    return {"message": "처리 중입니다. Redis 채널(chat-response)로 전송됩니다."}
 
 
 async def get_embedding_batch(article_list, request):
@@ -570,7 +232,7 @@ async def get_embedding_batch(article_list, request):
     return all_embeddings
 
 
-def get_news_metadata_df(news_ids: list) -> pd.DataFrame:
+async def get_news_metadata_df(news_ids: list) -> pd.DataFrame:
     """
     뉴스 ID 목록을 받아 각 뉴스의 메타데이터를 조회하여 DataFrame으로 반환
     :param news_ids: 뉴스 ID 문자열 리스트 (예: ['20250513_0092', '20250618_28735495'])
@@ -611,8 +273,8 @@ async def get_news_recommended(payload, request):
     news_candidate_ids = payload.news_candidate_ids
 
     # 임베딩
-    news_clicked_metadata = get_news_metadata_df(news_clicked_ids)
-    news_candidate_medatata = get_news_metadata_df(news_candidate_ids)
+    news_clicked_metadata = await get_news_metadata_df(news_clicked_ids)
+    news_candidate_medatata = await get_news_metadata_df(news_candidate_ids)
 
     news_clicked_summaries = news_clicked_metadata["summary"].tolist()
     news_candidate_summaries = news_candidate_medatata["summary"].tolist()

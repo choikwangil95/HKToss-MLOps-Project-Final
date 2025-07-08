@@ -28,6 +28,11 @@ class NewsOut(BaseModel):
     content: str
 
 
+class NewsCountOut(BaseModel):
+    news_count_total: int
+    news_count_today: int
+
+
 class NewsStock(BaseModel):
     news_id: str
     stocks: List[str]
@@ -70,6 +75,21 @@ class News_v2(BaseModel):
 
 
 class NewsOut_v2(BaseModel):
+    news_id: str
+    wdate: Optional[datetime]
+    title: str
+    article: str
+    url: Optional[str]
+    press: str
+    image: str
+    stock_list: Optional[List[Dict[str, str]]] = []
+    impact_score: Optional[float]
+
+    class Config:
+        from_attributes = True
+
+
+class NewsOut_v2_detail(BaseModel):
     news_id: str
     wdate: Optional[datetime]
     title: str
@@ -187,12 +207,13 @@ class TopNewsResponse(BaseModel):
     summary: str
     impact_score: float
     url: Optional[str]
+    stock_list: Optional[List[Dict[str, str]]] = []
 
     class Config:
         from_attributes = True
 
 
-class RecommendNewsResponse(BaseModel):
+class RecommendNews(BaseModel):
     news_id: str
     wdate: datetime  # 날짜+시간
     title: str
@@ -201,6 +222,15 @@ class RecommendNewsResponse(BaseModel):
     press: str | None  # 언론사 (nullable)
     url: Optional[str]
     click_score: float
+    recommend_reasons: List
+    stock_list: Optional[List[Dict[str, str]]] = []
+
+
+class RecommendNewsResponse(BaseModel):
+    user_click_count: int
+    use_other_user: bool
+    other_user_data: Optional[Dict]
+    news_data: List[RecommendNews]
 
     class Config:
         from_attributes = True
@@ -215,6 +245,7 @@ class SimilarNewsV2(BaseModel):
     image: str
     summary: str
     similarity: float
+    stock_list: Optional[List[Dict[str, str]]] = []
 
     class Config:
         from_attributes = True

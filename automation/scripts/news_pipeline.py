@@ -263,55 +263,65 @@ def save_to_db_similar(articles):
         log.info("저장할 뉴스 없음")
         return
 
-    conn = None  # ✅ 먼저 None으로 초기화
-    cur = None
-
-    for article in articles:
-        news_id = article["news_id"]
-
-        try:
-            url = f"http://fastapi:8000/news/v2/{news_id}/similar/realtime"
-
-            r = requests.get(url, timeout=5)
-            r.raise_for_status()
-
-            similar_news_list = r.json()
-
-        except Exception as e:
-            print(f"❌ {news_id} 유사뉴스 조회 실패: {e}")
+    DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@db:5432/news_db")
 
     try:
-        DB_URL = os.getenv(
-            "DATABASE_URL", "postgresql://postgres:password@db:5432/news_db"
-        )
         conn = psycopg2.connect(DB_URL)
         cur = conn.cursor()
 
         insert_query = """
-		INSERT INTO news_v2_similar (news_id, sim_news_id, wdate, title, summary, press, url, image, similarity)
-		VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-		ON CONFLICT (news_id, sim_news_id) DO NOTHING;
-		"""
+        INSERT INTO news_v2_similar (news_id, sim_news_id, wdate, title, summary, press, url, image, similarity)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (news_id, sim_news_id) DO NOTHING;
+        """
 
-        values = [
-            (
-                article["news_id"],
-                similar_news["news_id"],
-                datetime.fromisoformat(similar_news["wdate"]),
-                similar_news["title"],
-                similar_news["summary"],
-                similar_news["press"],
-                similar_news["url"],
-                similar_news["image"],
-                similar_news["similarity"],
-            )
-            for similar_news in similar_news_list
-        ]
+        delete_query = """
+        DELETE FROM news_v2 WHERE news_id = %s;
+        """
 
-        execute_batch(cur, insert_query, values)
+        total_inserted = 0
+
+        for article in articles:
+            news_id = article["news_id"]
+            try:
+                url = f"http://fastapi:8000/news/v2/{news_id}/similar/realtime"
+                r = requests.get(url, timeout=5)
+                r.raise_for_status()
+                similar_news_list = r.json()
+            except Exception as e:
+                log.warning(
+                    f"❌ {news_id} 유사뉴스 조회 실패 → news_v2에서 삭제 시도: {e}"
+                )
+                try:
+                    cur.execute(delete_query, (news_id,))
+                    conn.commit()
+                    log.info(f"🗑️ news_v2에서 {news_id} 삭제 완료")
+                except Exception as delete_err:
+                    log.error(
+                        f"❌ {news_id} 삭제 실패 ({type(delete_err).__name__}): {delete_err}"
+                    )
+                continue  # 실패한 뉴스 스킵
+
+            values = [
+                (
+                    news_id,
+                    sn["news_id"],
+                    datetime.fromisoformat(sn["wdate"]),
+                    sn["title"],
+                    sn["summary"],
+                    sn["press"],
+                    sn["url"],
+                    sn["image"],
+                    sn["similarity"],
+                )
+                for sn in similar_news_list
+            ]
+
+            execute_batch(cur, insert_query, values)
+            total_inserted += len(values)
+
         conn.commit()
-
-        log.info(f"🧾 실시간 유사 뉴스 DB 저장 완료: {len(values)}건 저장")
+        log.info(f"🧾 실시간 유사 뉴스 DB 저장 완료: {total_inserted}건 저장")
 
     except Exception as e:
         log.error(f"❌ 실시간 유사 뉴스 DB 저장 중 오류 ({type(e).__name__}): {e}")
@@ -988,10 +998,41 @@ def predict_topic_for_df(df, vectorizer, lda_model, stopwords, n_topics=9):
     return result_df
 
 
+def get_news_counts():
+    conn = None
+    cur = None
+
+    try:
+        DB_URL = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@3.37.207.16:5432/postgres"
+        )
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor()
+
+        cur.execute("SELECT COUNT(*) FROM news_v2")
+        count_all = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM news_v2 WHERE DATE(wdate) = CURRENT_DATE")
+        count_today = cur.fetchone()[0]
+
+        return count_all, count_today
+
+    except Exception as e:
+        print.error(f"❌ 뉴스 조회 중 오류 ({type(e).__name__}): {e}")
+
+        return 0, 0
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+
 def send_to_redis(news_data):
     try:
         r = redis.Redis(
-            host="43.200.17.139",
+            host="3.39.99.26",
             port=6379,
             password="q1w2e3r4!@#",
             decode_responses=True,  # bytes 대신 str 로 받기
@@ -1000,20 +1041,32 @@ def send_to_redis(news_data):
             log.error("Redis 서버에 연결할 수 없습니다.")
             return
 
+        news_count_total, news_count_today = get_news_counts()
+
         # Redis에 저장
         for news in news_data:
             channel = "news-channel"
 
             wdate = datetime.strptime(news["wdate"], "%Y-%m-%d %H:%M").isoformat()
+            stock_list = (
+                ast.literal_eval(news["stock_list"])
+                if isinstance(news["stock_list"], str)
+                else news["stock_list"]
+            )
+
             data = {
                 "news_id": news["news_id"],
                 "wdate": wdate,
                 "title": news["title"],
                 "article": news["article"],
+                "summary": news["summary"],
+                "stock": stock_list[-1] if stock_list else None,
                 "press": news["press"],
                 "url": news["url"],
                 "image": news["image"],
                 "impact_score": news["impact_score"],
+                "news_count_total": news_count_total,
+                "news_count_today": news_count_today,
             }
             message = json.dumps(data, ensure_ascii=False)
             r.publish(channel, message)
@@ -1359,8 +1412,9 @@ def request_impact_score(news_id):
 
         d_plus = r.json().get("d_plus", [])
         impact_score = r.json().get("impact_score", 0)
+        scaled_impact_score = scale_impact_score(impact_score)
 
-        return {"news_id": news_id, "score": impact_score, "d_plus": d_plus}
+        return {"news_id": news_id, "score": scaled_impact_score, "d_plus": d_plus}
 
     except Exception as e:
         print(f"❌ {news_id} 뉴스 중요도 예측 실패: {e}")
@@ -1370,6 +1424,34 @@ def request_impact_score(news_id):
 
 def get_impact_score(market_datas):
     return [request_impact_score(md["news_id"]) for md in market_datas]
+
+
+def scale_impact_score(value, threshold=0.3):
+    if value is None:
+        return 0
+    try:
+        if value <= threshold:
+            return round((value / threshold) * 100, 0)
+        else:
+            return 100
+    except:
+        return 0
+
+
+import math
+
+
+def drop_invalid_rows(data_list):
+    cleaned = []
+    for row in data_list:
+        # invalid value가 하나라도 있으면 그 row는 제외
+        if any(
+            v is None or (isinstance(v, float) and (math.isnan(v) or math.isinf(v)))
+            for v in row.values()
+        ):
+            continue  # 무시
+        cleaned.append(row)
+    return cleaned
 
 
 if __name__ == "__main__":
