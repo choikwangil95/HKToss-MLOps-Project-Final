@@ -21,8 +21,8 @@
     <td align="center">
       <img src="https://avatars.githubusercontent.com/choikwangil95?s=150"><br>
       <a href="https://github.com/choikwangil95">최광일</a><br>
-      데이터 파이프라인<br>
-      MLOps
+      과거 유사 뉴스 선별 모델링<br>
+      모델 서빙 인프라 구축
     </td>
     <td align="center">
       <img src="https://avatars.githubusercontent.com/yeaaaun?s=150"><br>
